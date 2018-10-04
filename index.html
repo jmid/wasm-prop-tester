@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Simple template</title>
+  </head>
+  <body>
+    <script>
+
+      var importObject = {
+        imports: { imported_func: arg => console.log(arg) }
+      };
+
+      // var result = fetch('module.wasm')
+      // .then(console.log('result'));
+
+      // WebAssembly.instantiateStreaming(fetch('module.wasm'))
+      // .then(obj => {
+      //   console.log("something");
+      //   console.log(obj.instance.exports);
+      // });
+
+      fetch('module.wasm').then(response =>
+        response.arrayBuffer()
+      ).then(bytes =>
+        WebAssembly.instantiate(bytes)
+      ).then(result => {
+        console.log(result)
+        console.log(result.instance.exports.factorial(5))
+      });
+
+      
+      let source = '(module (func (export "f") (param i32 i32) (result i32) (i32.add (get_local 0) (get_local 1))))'
+      let binary = WebAssemblyText.encode(source)
+
+    </script>
+  </body>
+</html>
