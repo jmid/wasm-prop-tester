@@ -150,14 +150,16 @@ let arithmetic =
   (set_shrink tshrink arb_tree)
   (fun e -> 
     output_to_file e; 
-    (*Sys.command ("../wasm " ^ file ^ " -e '(invoke \"aexp\")'");*)
+    (*Sys.command ("wasm test_module2.wat -e '(invoke \"aexp\")'");*)
     (*print_endline (string_of_int (interpret e));*)
-    let ic = open_process_in ("../wasm " ^ file ^ " -e '(invoke \"aexp\")'") in
+    let ic = open_process_in ("wasm " ^ file ^ " -e '(invoke \"aexp\")'") in
       try
         let line = input_line ic in
           let r = regexp (string_of_int (interpret e)) in 
-              string_match r line 0
+            close_process_in ic;
+            string_match r line 0
       with End_of_file ->
+        close_process_in ic;
         true
     )
 ;;
