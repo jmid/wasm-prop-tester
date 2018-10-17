@@ -152,12 +152,15 @@ let arithmetic =
     Sys.command ("wat2wasm test_module2.wat -o test_module2.wasm");
     Sys.command ("node ../javascript/convert.js test_module2.wasm > test_module2.js");
     (*Sys.command ("eshost -h Cha*,Sp*,Ja*,V8* -u test_module2.js") = 0;*)
-    Sys.command ("(ch test_module2.js)>ch_tmp");
-    Sys.command ("(v8 test_module2.js)>v8_tmp");
-    Sys.command ("(sm test_module2.js)>sm_tmp");
-    (* Sys.command ("(jsc test_module2.js)>jsc_tmp"); *)
-      Sys.command ("cmp ch_tmp v8_tmp") = Sys.command ("cmp v8_tmp sm_tmp")
-      (* && Sys.command ("cmp sm_tmp jsc_tmp") = Sys.command ("cmp v8_tmp sm_tmp") *)
+    Sys.command ("(ch test_module2.js) > tmp_ch");
+    Sys.command ("(v8 test_module2.js) > tmp_v8");
+    Sys.command ("(sm test_module2.js) > tmp_sm");
+    (* Sys.command ("(jsc test_module2.js) > tmp_jsc"); *)
+    let ch_v8 = Sys.command ("cmp tmp_ch tmp_v8")
+    and v8_sm = Sys.command ("cmp tmp_v8 tmp_sm")
+    (* and sm_jsc = Sys.command ("cmp tmp_sm tmp_jsc") *) in
+      Sys.command ("rm tmp_*");
+      ch_v8 = v8_sm (* && v8_sm = sm_jsc *)
   )
 ;;
 
