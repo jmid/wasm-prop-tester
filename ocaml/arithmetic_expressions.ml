@@ -61,7 +61,7 @@ let mygen =
 	 Gen.map2 (fun l r -> Add(l,r)) (recgen(n/2)) (recgen(n/2));
 	 Gen.map2 (fun l r -> Sub(l,r)) (recgen(n/2)) (recgen(n/2));
 	 Gen.map2 (fun l r -> Mul(l,r)) (recgen(n/2)) (recgen(n/2));
-	 Gen.map2 (fun l r -> Div(l,r)) (recgen(n/2)) (recgen(n/2)); ]))
+	 (*Gen.map2 (fun l r -> Div(l,r)) (recgen(n/2)) (recgen(n/2));*) ]))
 
 
    let rec height ae = match ae with
@@ -88,24 +88,24 @@ let arb_tree = make ~print:exp_to_string ~stats:[("tree height'", height)] mygen
 (*To Wasm*)
 let exp_to_wat ae =
   let rec exp_to_string ae = match ae with
-    | Lit i -> "(i64.const " ^ string_of_int i ^ ")"
+    | Lit i -> "(i32.const " ^ string_of_int i ^ ")"
     | Add (ae0, ae1) ->
       let s0 = exp_to_string ae0 in
       let s1 = exp_to_string ae1 in
-      "(i64.add " ^ s0 ^ " " ^ s1 ^ ")"
+      "(i32.add " ^ s0 ^ " " ^ s1 ^ ")"
     | Sub (ae0, ae1) ->
       let s0 = exp_to_string ae0 in
       let s1 = exp_to_string ae1 in
-      "(i64.sub " ^ s0 ^ " " ^ s1 ^ ")"
+      "(i32.sub " ^ s0 ^ " " ^ s1 ^ ")"
     | Mul (ae0, ae1) ->
       let s0 = exp_to_string ae0 in
       let s1 = exp_to_string ae1 in
-      "(i64.mul " ^ s0 ^ " " ^ s1 ^ ")"
+      "(i32.mul " ^ s0 ^ " " ^ s1 ^ ")"
     | Div (ae0, ae1) ->
       let s0 = exp_to_string ae0 in
       let s1 = exp_to_string ae1 in
-      "(i64.div_s " ^ s0 ^ " " ^ s1 ^ ")"
-  in "(module (func (export \"aexp\") (result i64) " ^ exp_to_string ae ^ "))"
+      "(i32.div_s " ^ s0 ^ " " ^ s1 ^ ")"
+  in "(module (func (export \"aexp\") (result i32) " ^ exp_to_string ae ^ "))"
 
 let file = "test_module2.wat"
 
@@ -144,7 +144,7 @@ let rec tshrink e = match e with
 ;;
 
 let arithmetic =
-  Test.make ~count:2000 
+  Test.make ~count:1000 
   (*arb_tree*)
   (*(set_shrink tshrink arb_tree)*)
   (set_shrink tshrink arb_tree)
@@ -152,7 +152,7 @@ let arithmetic =
     output_to_file e; 
     (*Sys.command ("wasm test_module2.wat -e '(invoke \"aexp\")'");*)
     (*print_endline (string_of_int (interpret e));*)
-    let ic = open_process_in ("wasm " ^ file ^ " -e '(invoke \"aexp\")'") in
+    (*let ic = open_process_in ("wasm " ^ file ^ " -e '(invoke \"aexp\")'") in
       try
         let line = input_line ic in
           let r = regexp (string_of_int (interpret e)) in 
@@ -160,8 +160,26 @@ let arithmetic =
             string_match r line 0
       with End_of_file ->
         close_process_in ic;
-        true
+        true*)
+      Sys.command ("wat2wasm test_module2.wat -o test_module2.wasm");
+      Sys.command ("node ../javascript/convert.js test_module2.wasm > test_module2.js");
+      (*Sys.command ("eshost -h Cha*,Sp*,Ja*,V8* -u test_module2.js") = 0;*)
+      let ch = Sys.command ("ch test_module2.js") 
+      and v8 = Sys.command ("v8 test_module2.js")
+      and sm = Sys.command ("sm test_module2.js") in
+          ch = v8 && v8 = sm
+      (*let ic = open_process_in ("eshost -h Cha*,Sp*,Ja*,V8* -u test_module2.js") in
+        try
+          let line = input_line ic in
+            (*print_endline line;*)
+            close_process_in ic
+        with End_of_file ->
+          close_process_in ic
+      *)
     )
 ;;
 
+(*
+QCheck_runner.set_seed(23288955);;
 QCheck_runner.run_tests ~verbose:true [ arithmetic; ] ;;
+*)
