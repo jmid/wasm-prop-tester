@@ -145,38 +145,20 @@ let rec tshrink e = match e with
 
 let arithmetic =
   Test.make ~count:1000 
-  (*arb_tree*)
-  (*(set_shrink tshrink arb_tree)*)
   (set_shrink tshrink arb_tree)
   (fun e -> 
     output_to_file e; 
     (*Sys.command ("wasm test_module2.wat -e '(invoke \"aexp\")'");*)
-    (*print_endline (string_of_int (interpret e));*)
-    (*let ic = open_process_in ("wasm " ^ file ^ " -e '(invoke \"aexp\")'") in
-      try
-        let line = input_line ic in
-          let r = regexp (string_of_int (interpret e)) in 
-            close_process_in ic;
-            string_match r line 0
-      with End_of_file ->
-        close_process_in ic;
-        true*)
-      Sys.command ("wat2wasm test_module2.wat -o test_module2.wasm");
-      Sys.command ("node ../javascript/convert.js test_module2.wasm > test_module2.js");
-      (*Sys.command ("eshost -h Cha*,Sp*,Ja*,V8* -u test_module2.js") = 0;*)
-      let ch = Sys.command ("ch test_module2.js") 
-      and v8 = Sys.command ("v8 test_module2.js")
-      and sm = Sys.command ("sm test_module2.js") in
-          ch = v8 && v8 = sm
-      (*let ic = open_process_in ("eshost -h Cha*,Sp*,Ja*,V8* -u test_module2.js") in
-        try
-          let line = input_line ic in
-            (*print_endline line;*)
-            close_process_in ic
-        with End_of_file ->
-          close_process_in ic
-      *)
-    )
+    Sys.command ("wat2wasm test_module2.wat -o test_module2.wasm");
+    Sys.command ("node ../javascript/convert.js test_module2.wasm > test_module2.js");
+    (*Sys.command ("eshost -h Cha*,Sp*,Ja*,V8* -u test_module2.js") = 0;*)
+    Sys.command ("(ch test_module2.js)>ch_tmp");
+    Sys.command ("(v8 test_module2.js)>v8_tmp");
+    Sys.command ("(sm test_module2.js)>sm_tmp");
+    (* Sys.command ("(jsc test_module2.js)>jsc_tmp"); *)
+      Sys.command ("cmp ch_tmp v8_tmp") = Sys.command ("cmp v8_tmp sm_tmp")
+      (* && Sys.command ("cmp sm_tmp jsc_tmp") = Sys.command ("cmp v8_tmp sm_tmp") *)
+  )
 ;;
 
 (*
