@@ -144,28 +144,14 @@ let rec tshrink e = match e with
 ;;
 
 let arithmetic =
-  Test.make ~count:1000 
+  Test.make ~name:"Arithmetic expressions" ~count:1000 
   (set_shrink tshrink arb_tree)
   (fun e -> 
     output_to_file e; 
-    Sys.command ("wat2wasm test_module2.wat -o test_module2.wasm");
-    Sys.command ("node ../javascript/convert.js test_module2.wasm > test_module2.js");
-    (*Sys.command ("eshost -h Cha*,Sp*,Ja*,V8* -u test_module2.js") = 0;*)
-    Sys.command ("wasm test_module2.wat -e '(invoke \"aexp\")' | sed 's/\([0-9]\+\).*/\1/' > tmp_ref");
-    Sys.command ("(ch test_module2.js) > tmp_ch");
-    Sys.command ("(v8 test_module2.js) > tmp_v8");
-    Sys.command ("(sm test_module2.js) > tmp_sm");
-    (* Sys.command ("(jsc test_module2.js) > tmp_jsc"); *)
-    let ref_ch = Sys.command ("cmp tmp_ref tmp_ch") 
-    and ch_v8 = Sys.command ("cmp tmp_ch tmp_v8")
-    and v8_sm = Sys.command ("cmp tmp_v8 tmp_sm")
-    (* and sm_jsc = Sys.command ("cmp tmp_sm tmp_jsc") *) in
-      Sys.command ("rm tmp_*");
-      ref_ch = ch_v8 && ch_v8 = v8_sm (* && v8_sm = sm_jsc *)
+    Sys.command ("../script/compare.sh test_module2.wat") = 0
   )
 ;;
 
-(*
+(**)
 QCheck_runner.set_seed(23288955);;
 QCheck_runner.run_tests ~verbose:true [ arithmetic; ] ;;
-*)
