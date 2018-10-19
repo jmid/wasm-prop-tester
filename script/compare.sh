@@ -28,11 +28,11 @@ node ../javascript/convert.js "$WASM_FILE" > "$JS_FILE"
 
 # eshost -h Cha*,Sp*,Ja*,V8* -u "$JS_FILE"
 
-wasm "$WASM_FILE" -e "(invoke \"aexp\")" | sed "s/\([0-9]\+\).*/\1/" > $TMP_REF
-ch "$JS_FILE" > $TMP_CH
-v8 "$JS_FILE" > $TMP_V8
-sm "$JS_FILE" > $TMP_SM
-jsc "$JS_FILE" > $TMP_JSC
+wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> $TMP_REF | sed "s/\([0-9]\+\).*/\1/" >> $TMP_REF
+ch "$JS_FILE" > $TMP_CH 2>&1
+v8 "$JS_FILE" > $TMP_V8 2>&1
+sm "$JS_FILE" > $TMP_SM 2>&1
+jsc "$JS_FILE" > $TMP_JSC 2>&1
 
 REF_CH="$(cmp $TMP_REF $TMP_CH)"
 CH_V8="$(cmp $TMP_CH $TMP_V8)"

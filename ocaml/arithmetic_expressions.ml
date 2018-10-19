@@ -60,30 +60,30 @@ let mygen =
 	[leafgen;
 	 Gen.map2 (fun l r -> Add(l,r)) (recgen(n/2)) (recgen(n/2));
 	 Gen.map2 (fun l r -> Sub(l,r)) (recgen(n/2)) (recgen(n/2));
-	 Gen.map2 (fun l r -> Mul(l,r)) (recgen(n/2)) (recgen(n/2));
+   Gen.map2 (fun l r -> Mul(l,r)) (recgen(n/2)) (recgen(n/2));
 	 (*Gen.map2 (fun l r -> Div(l,r)) (recgen(n/2)) (recgen(n/2));*) ]))
 
 
-   let rec height ae = match ae with
-     | Lit i -> 0
-     | Add (ae0, ae1) ->
-       let h0 = height ae0 in
-       let h1 = height ae1 in
-       1 + (max h0 h1)
-     | Sub (ae0, ae1) ->
-       let h0 = height ae0 in
-       let h1 = height ae1 in
-       1 + (max h0 h1)
-     | Mul (ae0, ae1) ->
-       let h0 = height ae0 in
-       let h1 = height ae1 in
-       1 + (max h0 h1)
-     | Div (ae0, ae1) ->
-       let h0 = height ae0 in
-       let h1 = height ae1 in
-       1 + (max h0 h1)
+let rec height ae = match ae with
+  | Lit i -> 0
+  | Add (ae0, ae1) ->
+    let h0 = height ae0 in
+    let h1 = height ae1 in
+    1 + (max h0 h1)
+  | Sub (ae0, ae1) ->
+    let h0 = height ae0 in
+    let h1 = height ae1 in
+    1 + (max h0 h1)
+  | Mul (ae0, ae1) ->
+    let h0 = height ae0 in
+    let h1 = height ae1 in
+    1 + (max h0 h1)
+  | Div (ae0, ae1) ->
+    let h0 = height ae0 in
+    let h1 = height ae1 in
+    1 + (max h0 h1)
 
-let arb_tree = make ~print:exp_to_string ~stats:[("tree height'", height)] mygen
+let arb_tree = make ~print:exp_to_string ~stats:[("Tree height'", height)] mygen
 
 (*To Wasm*)
 let exp_to_wat ae =
@@ -152,6 +152,7 @@ let arithmetic =
   )
 ;;
 
-(**)
+(*
 QCheck_runner.set_seed(23288955);;
 QCheck_runner.run_tests ~verbose:true [ arithmetic; ] ;;
+*)

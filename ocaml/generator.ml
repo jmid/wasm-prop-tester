@@ -1,4 +1,5 @@
 #load "wasm.cmo";;
+#use "arithmetic_expressions.ml";;
 
 open Wasm
 
@@ -35,13 +36,6 @@ let string_to_name s =
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
 
-let empty_f = 
-{
-  Ast.ftype = as_phrase 0l;
-  Ast.locals = [];
-  Ast.body = [as_phrase (Ast.Const (as_phrase (Values.I32 42l)));];
-}
-
 let get_module types funcs = {
   Ast.types = types;
   Ast.globals = [];
@@ -68,7 +62,74 @@ let types_ = [
   as_phrase (Types.FuncType ([], [Types.F64Type]))
 ];;
 
-let empty = get_module types_ [as_phrase (empty_f)] in
+let exp = Add ( Lit (1) , Lit (1));;
+
+(*Arithmetic expression To Wasm function*)
+let exp_to_func ae =
+  let f = [] in
+    let rec exp_to_f ae f = match ae with
+      | Lit i -> f @ [as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i))))]
+      | Add (ae0, ae1) ->
+        let s0 = exp_to_f ae0 f in
+        let s1 = exp_to_f ae1 f in
+        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add))]
+      | Sub (ae0, ae1) ->
+        let s0 = exp_to_f ae0 f in
+        let s1 = exp_to_f ae1 f in
+        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Sub))]
+      | Mul (ae0, ae1) ->
+        let s0 = exp_to_f ae0 f in
+        let s1 = exp_to_f ae1 f in
+        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Mul))]
+      | Div (ae0, ae1) ->
+        let s0 = exp_to_f ae0 f in
+        let s1 = exp_to_f ae1 f in
+        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.DivS))]
+    in exp_to_f ae f
+;;
+
+let expf = exp_to_func exp;;
+
+let empty_f = 
+  {
+    Ast.ftype = as_phrase 0l;
+    Ast.locals = [];
+    (*Ast.body = [as_phrase (Ast.Const (as_phrase (Values.I32 42l)))];*)
+    Ast.body = expf;
+  }
+;;
+
+let get_func body = 
+  {
+    Ast.ftype = as_phrase 0l;
+    Ast.locals = [];
+    Ast.body = body;
+  }
+;;
+
+let empty = get_module types_ [as_phrase (get_func (exp_to_func exp))] in
   let empty_module = as_phrase (empty) in
     let arrange_m = Arrange.module_ empty_module in
-      Sexpr.print 80 arrange_m;;
+      Sexpr.print 80 arrange_m
+;;
+
+let wasm_to_file m = 
+  let oc = open_out file in 
+    Sexpr.output oc 80 m;
+    close_out oc
+;;
+
+let arithmetic_ast =
+  Test.make ~name:"Arithmetic expressions" ~count:1000 
+  (set_shrink tshrink arb_tree)
+  (fun e -> 
+    let empty = get_module types_ [as_phrase (get_func (exp_to_func e))] in
+      let empty_module = as_phrase (empty) in
+        let arrange_m = Arrange.module_ empty_module in
+          wasm_to_file arrange_m
+    ;
+    Sys.command ("../script/compare.sh test_module2.wat") = 0
+  )
+;;
+
+QCheck_runner.run_tests ~verbose:true [ arithmetic_ast; ] ;;
