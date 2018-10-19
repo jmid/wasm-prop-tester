@@ -1,5 +1,6 @@
 #load "wasm.cmo";;
 #use "arithmetic_expressions.ml";;
+#use "generator/instr_gen.ml";;
 
 open Wasm
 
@@ -133,11 +134,29 @@ let wasm_to_file m =
     close_out oc
 ;;
 
+(* 
 let arithmetic_ast =
   Test.make ~name:"Arithmetic expressions" ~count:10 
   (set_shrink tshrink arb_tree)
   (fun e -> 
     let empty = get_module types_ [as_phrase (get_func (exp_to_func e))] in
+      let empty_module = as_phrase (empty) in
+        let arrange_m = Arrange.module_ empty_module in
+          wasm_to_file arrange_m
+    ;
+    Sys.command ("../script/compare.sh " ^ file_name) = 0
+  )
+;;
+
+QCheck_runner.run_tests ~verbose:true [ arithmetic_ast; ] ;;
+*)
+
+
+let arithmetic_ast =
+  Test.make ~name:"Arithmetic expressions" ~count:1000 
+  arb_intsr
+  (fun e -> 
+    let empty = get_module types_ [as_phrase (get_func e)] in
       let empty_module = as_phrase (empty) in
         let arrange_m = Arrange.module_ empty_module in
           wasm_to_file arrange_m

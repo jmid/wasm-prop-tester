@@ -5,7 +5,8 @@ open Wasm
 open QCheck
 
 (*
-instr' =
+type instr = instr' Source.phrase
+and instr' =
   | Unreachable                       (* trap unconditionally *)
   | Nop                               (* do nothing *)
   | Drop                              (* forget a value *)
@@ -37,7 +38,7 @@ instr' =
 *)
 
 (* Constants generator *)
-let const_gen = Gen.map (fun i -> Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i))))) Gen.small_nat
+let const_gen = Gen.map (fun i -> [Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i))))]) Gen.small_nat
 
 let a = Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add));;
 
@@ -45,31 +46,49 @@ let a = Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add));;
 let binop_gen =
   Gen.oneofl
 	[
-    Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add));
-    Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Sub));
-    Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Mul));
+    [Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add))];
+    [Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Sub))];
+    [Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Mul))];
   ]
-
-let arb_const = make binop_gen
 ;;
 
 let instr_to_string (instr : Ast.instr) = 
   let instr' = instr.it in
     match instr' with
-    | Ast.Const v   -> Values.string_of_value v.it
+    | Ast.Const v   -> Values.string_of_value v.it ^ " "
     | Ast.Binary b  -> (match b with
-      | Values.I32 Ast.IntOp.Add -> "Add"
-      | Values.I32 Ast.IntOp.Sub -> "Sub"
-      | Values.I32 Ast.IntOp.Mul -> "Mul")
+      | Values.I32 Ast.IntOp.Add -> "Add "
+      | Values.I32 Ast.IntOp.Sub -> "Sub "
+      | Values.I32 Ast.IntOp.Mul -> "Mul ")
     | _             -> ""
+;;
 
+let rec instr_list_to_string instr_list = match instr_list with
+  | e::es -> (instr_to_string e) ^ (instr_list_to_string es)
+  | []    -> ""
+
+let op_gen =
+  Gen.map3 (fun l r op -> l @ r @ op ) const_gen const_gen binop_gen
+
+let instr_gen =
+  Gen.sized (Gen.fix 
+    (fun recgen n -> match n with
+      | 0 -> const_gen
+      | n -> Gen.map3 (fun l r op -> l @ r @ op ) (recgen(n/2)) (recgen(n/2)) binop_gen
+    ))
+;;
+
+let arb_intsr = make ~print:instr_list_to_string instr_gen
+
+(*
 let test =
   Test.make ~name:"Test" ~count:10
-  arb_const
+  arb
   (fun e -> 
-    print_endline (instr_to_string e);
+    print_endline (instr_list_to_string e);
     true
   )
 ;;
-
+ 
 QCheck_runner.run_tests ~verbose:true [ test; ] ;;
+*)
