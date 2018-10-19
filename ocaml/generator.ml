@@ -3,6 +3,21 @@
 
 open Wasm
 
+let tmp_dir_name = "tmp";;
+
+
+let tmp_dir = match Sys.file_exists tmp_dir_name with
+  | true  -> ()
+  | false -> Unix.mkdir tmp_dir_name 0o775;;
+
+let file_name = tmp_dir_name ^ "/" ^ "tmp_sexpr.wat";;
+
+
+
+(* 
+let file_name = "tmp_sexpr.wat";;
+*)
+
 (* type 'a phrase = {at : region; it : 'a} *)
 (*
 type module_' = {
@@ -66,26 +81,25 @@ let exp = Add ( Lit (1) , Lit (1));;
 
 (*Arithmetic expression To Wasm function*)
 let exp_to_func ae =
-  let f = [] in
-    let rec exp_to_f ae f = match ae with
-      | Lit i -> f @ [as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i))))]
+    let rec exp_to_f ae = match ae with
+      | Lit i -> [as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i))))]
       | Add (ae0, ae1) ->
-        let s0 = exp_to_f ae0 f in
-        let s1 = exp_to_f ae1 f in
-        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add))]
+        let s0 = exp_to_f ae0 in
+        let s1 = exp_to_f ae1 in
+        s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add))]
       | Sub (ae0, ae1) ->
-        let s0 = exp_to_f ae0 f in
-        let s1 = exp_to_f ae1 f in
-        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Sub))]
+        let s0 = exp_to_f ae0 in
+        let s1 = exp_to_f ae1 in
+        s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Sub))]
       | Mul (ae0, ae1) ->
-        let s0 = exp_to_f ae0 f in
-        let s1 = exp_to_f ae1 f in
-        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Mul))]
+        let s0 = exp_to_f ae0 in
+        let s1 = exp_to_f ae1 in
+        s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Mul))]
       | Div (ae0, ae1) ->
-        let s0 = exp_to_f ae0 f in
-        let s1 = exp_to_f ae1 f in
-        f @ s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.DivS))]
-    in exp_to_f ae f
+        let s0 = exp_to_f ae0 in
+        let s1 = exp_to_f ae1 in
+        s0 @ s1 @ [ as_phrase (Ast.Binary (Values.I32 Ast.IntOp.DivS))]
+    in exp_to_f ae
 ;;
 
 let expf = exp_to_func exp;;
@@ -114,13 +128,13 @@ let empty = get_module types_ [as_phrase (get_func (exp_to_func exp))] in
 ;;
 
 let wasm_to_file m = 
-  let oc = open_out file in 
+  let oc = open_out file_name in 
     Sexpr.output oc 80 m;
     close_out oc
 ;;
 
 let arithmetic_ast =
-  Test.make ~name:"Arithmetic expressions" ~count:1000 
+  Test.make ~name:"Arithmetic expressions" ~count:10 
   (set_shrink tshrink arb_tree)
   (fun e -> 
     let empty = get_module types_ [as_phrase (get_func (exp_to_func e))] in
@@ -128,7 +142,7 @@ let arithmetic_ast =
         let arrange_m = Arrange.module_ empty_module in
           wasm_to_file arrange_m
     ;
-    Sys.command ("../script/compare.sh test_module2.wat") = 0
+    Sys.command ("../script/compare.sh " ^ file_name) = 0
   )
 ;;
 

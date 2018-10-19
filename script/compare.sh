@@ -41,8 +41,8 @@ SM_JSC="$(cmp $TMP_SM $TMP_JSC)"
 
 if [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] #&& [ "$V8_SM" = "$SM_JSC" ]
 then
-    rm $TMP_DIR/tmp_*
-    rmdir "$TMP_DIR"
+    # rm $TMP_DIR/tmp_*
+    # rmdir "$TMP_DIR"
     exit 0
 else
     exit 1
