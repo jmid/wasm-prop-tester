@@ -37,58 +37,111 @@ and instr' =
   | Convert of cvtop                  (* conversion *)
 *)
 
-(* Constants generator *)
-let const_gen = Gen.map (fun i -> [Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i))))]) Gen.small_nat
+(** nop_gen : value_type option -> (instr * value_type list) Gen.t *)
+let nop_gen t_opt = match t_opt with
+  | None   -> Gen.return (Helper.as_phrase (Ast.Nop), [])
+  | Some t -> Gen.return (Helper.as_phrase (Ast.Nop), [t])
+;;
 
-let a = Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add));;
+(** const_gen : value_type option -> (instr * value_type list) Gen.t *)
+let const_gen t_opt = match t_opt with
+  | Some Types.I32Type -> Gen.map (fun i -> Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), []) Gen.small_nat
+  | Some Types.I64Type -> Gen.map (fun i -> Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_int i)))), []) Gen.nat
+  | Some Types.F32Type -> Gen.map (fun i -> Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_float i)))), []) Gen.float
+  | Some Types.F64Type -> Gen.map (fun i -> Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_float i)))), []) Gen.float
+;;
 
-(* Binary operator generator *)
-let binop_gen =
+(** intOp_binop_gen : IntOp.binop Gen.t *)
+let intOp_binop_gen = 
   Gen.oneofl
 	[
-    [Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add))];
-    [Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Sub))];
-    [Helper.as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Mul))];
+    Ast.IntOp.Add;
+    Ast.IntOp.Sub;
+    Ast.IntOp.Mul;
   ]
 ;;
 
-let instr_to_string (instr : Ast.instr) = 
-  let instr' = instr.it in
-    match instr' with
-    | Ast.Const v   -> Values.string_of_value v.it ^ " "
-    | Ast.Binary b  -> (match b with
-      | Values.I32 Ast.IntOp.Add -> "Add "
-      | Values.I32 Ast.IntOp.Sub -> "Sub "
-      | Values.I32 Ast.IntOp.Mul -> "Mul ")
-    | _             -> ""
+(** floatOp_binop_gen : FloatOp.binop Gen.t *)
+let floatOp_binop_gen = 
+  Gen.oneofl
+	[
+    Ast.FloatOp.Add;
+    Ast.FloatOp.Sub;
+    Ast.FloatOp.Mul;
+  ]
 ;;
 
-let rec instr_list_to_string instr_list = match instr_list with
-  | e::es -> (instr_to_string e) ^ (instr_list_to_string es)
-  | []    -> ""
-
-let op_gen =
-  Gen.map3 (fun l r op -> l @ r @ op ) const_gen const_gen binop_gen
-
-let instr_gen =
-  Gen.sized (Gen.fix 
-    (fun recgen n -> match n with
-      | 0 -> const_gen
-      | n -> Gen.map3 (fun l r op -> l @ r @ op ) (recgen(n/2)) (recgen(n/2)) binop_gen
-    ))
+(** int_binop_gen : value_type option -> (instr * value_type list) Gen.t *)
+let int_binop_gen t_opt = match t_opt with
+  | Some Types.I32Type -> Gen.map (fun op -> Helper.as_phrase (Ast.Binary (Values.I32 op)), [Types.I32Type; Types.I32Type]) intOp_binop_gen
+  | Some Types.I64Type -> Gen.map (fun op -> Helper.as_phrase (Ast.Binary (Values.I64 op)), [Types.I64Type; Types.I64Type]) intOp_binop_gen
 ;;
 
-let arb_intsr = make ~print:instr_list_to_string instr_gen
+(** float_binop_gen : value_type -> (instr * value_type list) Gen.t *)
+let float_binop_gen t_opt = match t_opt with
+  | Some Types.F32Type -> Gen.map (fun op -> Helper.as_phrase (Ast.Binary (Values.F32 op)), [Types.F32Type; Types.F32Type]) floatOp_binop_gen
+  | Some Types.F64Type -> Gen.map (fun op -> Helper.as_phrase (Ast.Binary (Values.F64 op)), [Types.F64Type; Types.F64Type]) floatOp_binop_gen
+;;
 
-(*
+(** binop_gen : value_type -> (instr * value_type list) Gen.t *)
+let binop_gen t_opt = match t_opt with
+  | Some Types.I32Type | Some Types.I64Type -> int_binop_gen t_opt
+  | Some Types.F32Type | Some Types.F64Type -> float_binop_gen t_opt
+;;
+
+(** instr_rule : value_type option -> (instr * value_type list) option Gen.t *)
+let instr_rule t_opt = 
+  match t_opt with
+    | Some _ -> Gen.(oneof [ const_gen t_opt; binop_gen t_opt; nop_gen t_opt ] >>= fun (instr, ts) -> return (Some (instr, ts))) 
+    | None   -> Gen.(oneof [ nop_gen t_opt ] >>= fun (instr, ts) -> return (Some (instr, ts)))
+;;
+
+(** instrs_rule : value_type list -> value_type list -> (instr list) option Gen.t *)
+let rec instrs_rule input_ts output_ts = 
+  let recgen t_opt tr = Gen.(instr_rule t_opt >>= function
+        | None              -> return None
+        | Some (instr, ts)  -> 
+          instrs_rule input_ts (ts@tr) >>= (function
+            | None        -> return None
+            | Some instrs ->
+              return (Some (instrs@[instr])) ) ) in
+  match output_ts with
+    []          -> 
+      let empty_gen = recgen None [] in
+        if input_ts = output_ts 
+        then Gen.(oneof [ empty_gen; return (Some []) ])
+        else empty_gen
+    | t1::trst  ->
+      let empty_gen = recgen None output_ts
+      and non_empty_gen = recgen (Some t1) trst in
+        if input_ts = output_ts 
+        then Gen.(oneof [ empty_gen; non_empty_gen; return (Some []) ])
+        else Gen.(oneof [ empty_gen; non_empty_gen; ])
+;;
+
 let test =
   Test.make ~name:"Test" ~count:10
-  arb
-  (fun e -> 
-    print_endline (instr_list_to_string e);
-    true
+  (make (instrs_rule [] [Types.I32Type] ))
+  (function 
+      | Some instrs ->
+        print_endline (instr_list_to_string instrs);
+        true
+      | None -> false
   )
 ;;
  
 QCheck_runner.run_tests ~verbose:true [ test; ] ;;
+
+(* 
+let test =
+  Test.make ~name:"Test" ~count:10
+  (make (instr_rule (Some Types.I32Type) ))
+  (function 
+      | Some (instr, t) ->
+        print_endline (instr_list_to_string [instr]);
+        print_endline (String.concat "," (List.map Types.string_of_value_type t));
+        true
+      | None -> false
+  )
+;;
 *)
