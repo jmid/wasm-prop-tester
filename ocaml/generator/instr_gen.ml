@@ -119,6 +119,23 @@ let rec instrs_rule input_ts output_ts =
         else Gen.(oneof [ empty_gen; non_empty_gen; ])
 ;;
 
+let instr_to_string (instr : Ast.instr) = 
+  let instr' = instr.it in
+    match instr' with
+    | Ast.Const v   -> Values.string_of_value v.it ^ " "
+    | Ast.Binary b  -> (match b with
+      | Values.I32 Ast.IntOp.Add -> "Add "
+      | Values.I32 Ast.IntOp.Sub -> "Sub "
+      | Values.I32 Ast.IntOp.Mul -> "Mul ")
+    | Ast.Nop       -> "Nop "
+    | _             -> ""
+;;
+
+let rec instr_list_to_string instr_list = match instr_list with
+  | e::es -> (instr_to_string e) ^ (instr_list_to_string es)
+  | []    -> ""
+;;
+
 let test =
   Test.make ~name:"Test" ~count:10
   (make (instrs_rule [] [Types.I32Type] ))
