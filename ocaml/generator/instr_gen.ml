@@ -121,14 +121,16 @@ let instr_to_string (instr : Ast.instr) =
     | _             -> ""
 ;;
 
-let rec instr_list_to_string instr_list = match instr_list with
-  | e::es -> (instr_to_string e) ^ (instr_list_to_string es)
-  | []    -> ""
+let rec instr_list_to_string list_opt = match list_opt with
+  | None            -> ""
+  | Some instr_list -> match instr_list with
+    | e::es -> (instr_to_string e) ^ (instr_list_to_string (Some es))
+    | []    -> ""
 ;;
 
-let instr_gen = Gen.sized ~print:instr_list_to_string (fun n -> instrs_rule [] [] [Types.I32Type] n)
+let instr_gen = Gen.sized (fun n -> instrs_rule [] [] [Types.I32Type] n)
 
-let arb_intsr = make instr_gen
+let arb_intsr = make  ~print:instr_list_to_string instr_gen
 (*
 
 How often return None?
