@@ -1,8 +1,8 @@
-#load "wasm.cmo";;
-#use "util/helper.ml";;
+
 
 open Wasm
 open QCheck
+open Helper
 
 (*
 type instr = instr' Source.phrase
@@ -55,6 +55,8 @@ let intOp_binop_gen = Gen.oneofl
     Ast.IntOp.Add;
     Ast.IntOp.Sub;
     Ast.IntOp.Mul;
+    Ast.IntOp.DivS;
+    Ast.IntOp.DivU;
   ]
 
 (** floatOp_binop_gen : FloatOp.binop Gen.t *)
@@ -63,6 +65,7 @@ let floatOp_binop_gen = Gen.oneofl
     Ast.FloatOp.Add;
     Ast.FloatOp.Sub;
     Ast.FloatOp.Mul;
+    Ast.FloatOp.Div;
   ]
 
 (** int_binop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
@@ -71,20 +74,17 @@ let int_binop_gen con t_opt size = match t_opt with
   | Some Types.I64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Binary (Values.I64 op)), [Types.I64Type; Types.I64Type]))) intOp_binop_gen
 
 (** float_binop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
-and float_binop_gen con t_opt size = match t_opt with
+let float_binop_gen con t_opt size = match t_opt with
   | Some Types.F32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Binary (Values.F32 op)), [Types.F32Type; Types.F32Type]))) floatOp_binop_gen
   | Some Types.F64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Binary (Values.F64 op)), [Types.F64Type; Types.F64Type]))) floatOp_binop_gen
 
 (** binop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
-and binop_gen con t_opt size = match t_opt with
+let binop_gen con t_opt size = match t_opt with
   | Some Types.I32Type | Some Types.I64Type -> int_binop_gen con t_opt size
   | Some Types.F32Type | Some Types.F64Type -> float_binop_gen con t_opt size
 
 (** instrs_rule : module_ -> value_type list -> value_type list -> int -> (instr list) option Gen.t *)
-let rec instrs_rule con input_ts output_ts size = (*match size with 
-  | 0 -> let rules = List.concat [ [(1, const_gen con t_opt size)]; ] in
-                  listPermuteTermGenInner con t_opt size rules
-  | n ->*)
+let rec instrs_rule con input_ts output_ts size = 
     let recgen t_opt tr = Gen.(instr_rule con t_opt (size/2) >>= function
           | None              -> return None
           | Some (instr, ts)  -> 
@@ -107,13 +107,13 @@ let rec instrs_rule con input_ts output_ts size = (*match size with
 
 (** instr_rule : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 and instr_rule con t_opt size = match t_opt with
-    | None   -> let rules = List.concat [ [(1, nop_gen con t_opt size)] ] in
+    | None   -> let rules = [(1, nop_gen con t_opt size)] in
                   listPermuteTermGenInner con t_opt size rules
       (*Gen.(oneof [ nop_gen con t_opt size ] )*)
     | Some _ -> match size with 
-      | 0 -> let rules = List.concat [ [(1, const_gen con t_opt size)]; ] in
+      | 0 -> let rules = [(1, const_gen con t_opt size)]; in
                   listPermuteTermGenInner con t_opt size rules
-      | n -> let rules = List.concat [ [(1, const_gen con t_opt size)]; [(9, binop_gen con t_opt size)]; [(1, nop_gen con t_opt size)] ] in
+      | n -> let rules = [ (1, const_gen con t_opt size); (9, binop_gen con t_opt size); (1, nop_gen con t_opt size) ] in
                   listPermuteTermGenInner con t_opt size rules
       (*Gen.(oneof [ const_gen con t_opt size; binop_gen con t_opt size; nop_gen con t_opt size ] ) *)
 

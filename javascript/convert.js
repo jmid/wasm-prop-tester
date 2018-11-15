@@ -8,10 +8,19 @@ if (process.argv.length !== 3) {
 const buf = fs.readFileSync(process.argv[2]);
 const b = new Uint8Array(buf);
 
-const program = "var buffer = new Uint8Array(\["
+//"console = console || { log: (...args) => debug(Array.prototype.slice.call(args).join(' ')) };\n"
+
+const program = 
+    "var zero_div_re = /(divi.*zero)|(zero.*divi)/i;"
+    + "var debug = debug || (arg => console.log('-->', arg));"
+    + "var buffer = new Uint8Array(\["
     + b.toString()
     + "]);\n"
     + "let m = new WebAssembly.Instance(new WebAssembly.Module(buffer));\n"
-    + "console.log(m.exports.aexp());\n"
+    + "try {\n"
+    + "     debug(m.exports.aexp());\n"
+    + "} catch(e) {\n"
+    + "     if (zero_div_re.exec(e.message)) debug('integer divide by zero')\n"
+    + "}"
 
 console.log(program);

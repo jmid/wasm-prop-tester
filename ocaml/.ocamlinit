@@ -2,3 +2,5 @@ print_endline "Hello";;
 
 #use "topfind";;
 #require "qcheck";;
+#load "includes/wasm.cmo";;
+#load "_build/src/generator.cma"

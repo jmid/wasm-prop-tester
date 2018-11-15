@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ "$#" -ne 1 ] || ! [ -f "$1" ]; then
   echo "Usage: $0 FILE" >&2
@@ -28,7 +28,7 @@ node ../javascript/convert.js "$WASM_FILE" > "$JS_FILE"
 
 # eshost -h Cha*,Sp*,Ja*,V8* -u "$JS_FILE"
 
-wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> $TMP_REF | sed "s/\([0-9]\+\).*/\1/" >> $TMP_REF
+wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> >(sed "s/.*\(integer divide by zero\)/--> \1/") | sed "s/\(-\?[0-9]\+\).*/--> \1/" > $TMP_REF
 ch "$JS_FILE" > $TMP_CH 2>&1
 v8 "$JS_FILE" > $TMP_V8 2>&1
 sm "$JS_FILE" > $TMP_SM 2>&1
@@ -39,7 +39,7 @@ CH_V8="$(cmp $TMP_CH $TMP_V8)"
 V8_SM="$(cmp $TMP_V8 $TMP_SM)"
 SM_JSC="$(cmp $TMP_SM $TMP_JSC)"
 
-if [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] #&& [ "$V8_SM" = "$SM_JSC" ]
+if [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] && [ "$V8_SM" = "$SM_JSC" ]
 then
     # rm $TMP_DIR/tmp_*
     # rmdir "$TMP_DIR"

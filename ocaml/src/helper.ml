@@ -1,4 +1,4 @@
-#load "wasm.cmo";;
+
 
 open Wasm
 
@@ -38,4 +38,5 @@ struct
     as_phrase (Types.FuncType ([], [Types.F32Type]));
     as_phrase (Types.FuncType ([], [Types.F64Type]))
   ];;
+
 end

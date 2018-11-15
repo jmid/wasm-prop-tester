@@ -1,8 +1,9 @@
-#load "wasm.cmo";;
-#use "arithmetic_expressions.ml";;
-#use "generator/instr_gen.ml";;
+
 
 open Wasm
+open Helper
+open QCheck
+open Instr_gen
 
 let tmp_dir_name = "tmp";;
 
@@ -15,7 +16,10 @@ let file_name = tmp_dir_name ^ "/" ^ "tmp_sexpr.wat";;
 
 
 
-(* 
+(*
+
+#use "arithmetic_expressions.ml";;
+#use "generator/instr_gen.ml";; 
 let file_name = "tmp_sexpr.wat";;
 *)
 
@@ -41,42 +45,9 @@ and func' =
   locals : value_type list;
   body : instr list;
 }
-*)
-
-let string_to_name s =
-  let rec exp i l =
-    if i < 0 then l else exp (i - 1) (Char.code(s.[i]) :: l) in
-  exp (String.length s - 1) []
-;;
 
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
-
-let get_module types funcs = {
-  Ast.types = types;
-  Ast.globals = [];
-  Ast.tables = [];
-  Ast.memories = [];
-  Ast.funcs = funcs;
-  Ast.start = None;
-  Ast.elems  = [];
-  Ast.data = [];
-  Ast.imports = [];
-  Ast.exports = [
-    as_phrase ({
-      Ast.name = string_to_name "aexp";
-      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 0l));
-    })
-  ];
-}
-;;
-
-let types_ = [ 
-  as_phrase (Types.FuncType ([], [Types.I32Type]));
-  as_phrase (Types.FuncType ([], [Types.I64Type]));
-  as_phrase (Types.FuncType ([], [Types.F32Type]));
-  as_phrase (Types.FuncType ([], [Types.F64Type]))
-];;
 
 let exp = Add ( Lit (1) , Lit (1));;
 
@@ -107,25 +78,72 @@ let expf = exp_to_func exp;;
 
 let empty_f = 
   {
-    Ast.ftype = as_phrase 0l;
+    Ast.ftype = Helper.as_phrase 0l;
     Ast.locals = [];
     (*Ast.body = [as_phrase (Ast.Const (as_phrase (Values.I32 42l)))];*)
     Ast.body = expf;
   }
 ;;
 
+let empty = get_module types_ [Helper.as_phrase (get_func (exp_to_func exp))] in
+  let empty_module = Helper.as_phrase (empty) in
+    let arrange_m = Arrange.module_ empty_module in
+      Sexpr.print 80 arrange_m
+;;
+
+let arithmetic_ast =
+  Test.make ~name:"Arithmetic expressions" ~count:10 
+  (set_shrink tshrink arb_tree)
+  (fun e -> 
+    let empty = get_module types_ [Helper.as_phrase (get_func (exp_to_func e))] in
+      let empty_module = Helper.as_phrase (empty) in
+        let arrange_m = Arrange.module_ empty_module in
+          wasm_to_file arrange_m
+    ;
+    Sys.command ("../script/compare.sh " ^ file_name) = 0
+  )
+;;
+*)
+
+let types_ = [ 
+  Helper.as_phrase (Types.FuncType ([], [Types.I32Type]));
+  Helper.as_phrase (Types.FuncType ([], [Types.I64Type]));
+  Helper.as_phrase (Types.FuncType ([], [Types.F32Type]));
+  Helper.as_phrase (Types.FuncType ([], [Types.F64Type]))
+];;
+
+
+let string_to_name s =
+  let rec exp i l =
+    if i < 0 then l else exp (i - 1) (Char.code(s.[i]) :: l) in
+  exp (String.length s - 1) []
+;;
+
+let get_module types funcs = {
+  Ast.types = types;
+  Ast.globals = [];
+  Ast.tables = [];
+  Ast.memories = [];
+  Ast.funcs = funcs;
+  Ast.start = None;
+  Ast.elems  = [];
+  Ast.data = [];
+  Ast.imports = [];
+  Ast.exports = [
+    Helper.as_phrase ({
+      Ast.name = string_to_name "aexp";
+      Ast.edesc = Helper.as_phrase (Ast.FuncExport (Helper.as_phrase 0l));
+    })
+  ];
+}
+;;
+
 let get_func body = 
   {
-    Ast.ftype = as_phrase 0l;
+    Ast.ftype = Helper.as_phrase 0l;
     Ast.locals = [];
     Ast.body = body;
   }
-;;
-
-let empty = get_module types_ [as_phrase (get_func (exp_to_func exp))] in
-  let empty_module = as_phrase (empty) in
-    let arrange_m = Arrange.module_ empty_module in
-      Sexpr.print 80 arrange_m
 ;;
 
 let wasm_to_file m = 
@@ -134,27 +152,14 @@ let wasm_to_file m =
     close_out oc
 ;;
 
-let arithmetic_ast =
-  Test.make ~name:"Arithmetic expressions" ~count:10 
-  (set_shrink tshrink arb_tree)
-  (fun e -> 
-    let empty = get_module types_ [as_phrase (get_func (exp_to_func e))] in
-      let empty_module = as_phrase (empty) in
-        let arrange_m = Arrange.module_ empty_module in
-          wasm_to_file arrange_m
-    ;
-    Sys.command ("../script/compare.sh " ^ file_name) = 0
-  )
-;;
-
 let arithmetic_spec_ast =
   Test.make ~name:"Arithmetic expressions" ~count:1000 
-  arb_intsr
+  Instr_gen.arb_intsr
   (function
     | None    -> true
     | Some e  ->
-      let empty = get_module types_ [as_phrase (get_func e)] in
-        let empty_module = as_phrase (empty) in
+      let empty = get_module types_ [Helper.as_phrase (get_func e)] in
+        let empty_module = Helper.as_phrase (empty) in
           let arrange_m = Arrange.module_ empty_module in
             wasm_to_file arrange_m
       ;
@@ -162,6 +167,7 @@ let arithmetic_spec_ast =
   )
 ;;
 
+QCheck_runner.set_seed(401353417);;
 QCheck_runner.run_tests ~verbose:true [ arithmetic_spec_ast; ] ;;
 
 (*
