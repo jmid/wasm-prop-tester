@@ -1,0 +1,14 @@
+*.cmo
+*.cmx
+*.cmi
+*.cmt
+*.o
+*.native
+*.byte
+*.opt
+*.unopt
+*.js
+*.zip
+*.mlpack
+ocaml/_build
+ocaml/tmp
