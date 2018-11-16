@@ -153,7 +153,7 @@ let wasm_to_file m =
 ;;
 
 let arithmetic_spec_ast =
-  Test.make ~name:"Arithmetic expressions" ~count:1000 
+  Test.make ~name:"Arithmetic expressions" ~count:100 
   Instr_gen.arb_intsr
   (function
     | None    -> true

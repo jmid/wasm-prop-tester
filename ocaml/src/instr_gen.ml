@@ -49,6 +49,7 @@ and const_gen con t_opt size = match t_opt with
   | Some Types.F32Type -> Gen.map (fun i -> (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_float i)))), []))) Gen.float
   | Some Types.F64Type -> Gen.map (fun i -> (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_float i)))), []))) Gen.float
 
+(*** Unary operations *)
 (** intOp_unop_gen : IntOp.binop Gen.t *)
 let intOp_unop_gen = Gen.oneofl
   [ Ast.IntOp.Clz; Ast.IntOp.Ctz; Ast.IntOp.Popcnt; ]
@@ -72,6 +73,7 @@ let unop_gen con t_opt size = match t_opt with
   | Some Types.I32Type | Some Types.I64Type -> int_unop_gen con t_opt size
   | Some Types.F32Type | Some Types.F64Type -> float_unop_gen con t_opt size
 
+(*** Binary operations *)
 (** intOp_binop_gen : IntOp.unop Gen.t *)
 let intOp_binop_gen = Gen.oneofl
   [ Ast.IntOp.Add; Ast.IntOp.Sub; Ast.IntOp.Mul; Ast.IntOp.DivS; Ast.IntOp.DivU; Ast.IntOp.RemS; Ast.IntOp.RemU; 
@@ -95,6 +97,21 @@ let float_binop_gen con t_opt size = match t_opt with
 let binop_gen con t_opt size = match t_opt with
   | Some Types.I32Type | Some Types.I64Type -> int_binop_gen con t_opt size
   | Some Types.F32Type | Some Types.F64Type -> float_binop_gen con t_opt size
+
+(*** Test operations *)
+(** intOp_testop_gen : IntOp.testop Gen.t *)
+let intOp_testop_gen = Gen.oneofl
+  [ Ast.IntOp.Eqz; ]
+
+(** int_testop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let int_testop_gen con t_opt size = match t_opt with
+  | Some Types.I32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Test (Values.I32 op)), [Types.I32Type;]))) intOp_testop_gen
+  | Some Types.I64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Test (Values.I64 op)), [Types.I32Type;]))) intOp_testop_gen
+
+(** testop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let testop_gen con t_opt size = match t_opt with
+  | Some Types.I32Type | Some Types.I64Type -> int_testop_gen con t_opt size
+  | Some Types.F32Type | Some Types.F64Type -> Gen.return None
 
 (** instrs_rule : module_ -> value_type list -> value_type list -> int -> (instr list) option Gen.t *)
 let rec instrs_rule con input_ts output_ts size = 
@@ -126,7 +143,7 @@ and instr_rule con t_opt size = match t_opt with
     | Some _ -> match size with 
       | 0 -> let rules = [(1, const_gen con t_opt size)]; in
                   listPermuteTermGenInner con t_opt size rules
-      | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); (1, nop_gen con t_opt size) ] in
+      | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); (9, testop_gen con t_opt size); (1, nop_gen con t_opt size) ] in
                   listPermuteTermGenInner con t_opt size rules
       (*Gen.(oneof [ const_gen con t_opt size; binop_gen con t_opt size; nop_gen con t_opt size ] ) *)
 
