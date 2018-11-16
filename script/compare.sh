@@ -22,11 +22,21 @@ TMP_V8="$TMP_DIR/tmp_v8"
 TMP_SM="$TMP_DIR/tmp_sm"
 TMP_JSC="$TMP_DIR/tmp_jsc"
 
-wat2wasm "$WAT_FILE" -o "$WASM_FILE"
+ERROR_FILE="$TMP_DIR/error"
 
-node ../javascript/convert.js "$WASM_FILE" > "$JS_FILE"
+wat2wasm "$WAT_FILE" -o "$WASM_FILE" 2> "$ERROR_FILE"
+ERROR=$?
+if [ "$ERROR" != 0 ]
+then
+    exit "$ERROR"
+fi
 
-# eshost -h Cha*,Sp*,Ja*,V8* -u "$JS_FILE"
+node ../javascript/convert.js "$WASM_FILE" > "$JS_FILE" 2> "$ERROR_FILE"
+ERROR=$?
+if [ "$ERROR" != 0 ]
+then
+    exit "$ERROR"
+fi
 
 wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> >(sed "s/.*\(integer divide by zero\)/--> \1/") | sed "s/\(-\?[0-9]\+\).*/--> \1/" > $TMP_REF
 ch "$JS_FILE" > $TMP_CH 2>&1

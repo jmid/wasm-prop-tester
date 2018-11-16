@@ -1,8 +1,5 @@
-
-
 open Wasm
 open QCheck
-open Helper
 
 (*
 type instr = instr' Source.phrase
@@ -43,7 +40,13 @@ let nop_gen con t_opt size = match t_opt with
   | Some t -> Gen.return (Some (Helper.as_phrase (Ast.Nop), [t]))
   | None   -> Gen.return (Some (Helper.as_phrase (Ast.Nop), []))
 
-  (*** Const ***)
+(*** Drop ***)
+(** drop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let drop_gen con t_opt size = match t_opt with
+  | Some _ -> Gen.return None
+  | None   -> Gen.(oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> return (Some (Helper.as_phrase (Ast.Drop), [t])))
+
+(*** Const ***)
 (** const_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 and const_gen con t_opt size = match t_opt with
   | Some Types.I32Type -> Gen.(small_nat  >>= fun i -> return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), [])))
@@ -120,8 +123,7 @@ let int32Op_cvtop_gen = Gen.oneofl
     (Some (Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF32)), [Types.F32Type]));
     (Some (Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF64)), [Types.F64Type]));
     (Some (Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF64)), [Types.F64Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.ReinterpretFloat)), [Types.F32Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.ReinterpretFloat)), [Types.F64Type])); ]
+    (Some (Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.ReinterpretFloat)), [Types.F32Type])); ]
 
 (** int64Op_cvtop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let int64Op_cvtop_gen = Gen.oneofl
@@ -131,7 +133,6 @@ let int64Op_cvtop_gen = Gen.oneofl
     (Some (Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF32)), [Types.F32Type]));
     (Some (Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF64)), [Types.F64Type]));
     (Some (Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF64)), [Types.F64Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ReinterpretFloat)), [Types.F32Type]));
     (Some (Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ReinterpretFloat)), [Types.F64Type])); ]
 
 (** float32Op_cvtop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
@@ -141,18 +142,16 @@ let float32Op_cvtop_gen = Gen.oneofl
     (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI64)), [Types.I64Type]));
     (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI64)), [Types.I64Type]));
     (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.DemoteF64)), [Types.F64Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [Types.I32Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [Types.I64Type])); ]
+    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [Types.I32Type])); ]
 
 (** float64Op_cvtop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let float64Op_cvtop_gen = Gen.oneofl
-  [ (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI32)), [Types.I32Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI32)), [Types.I32Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI64)), [Types.I64Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI64)), [Types.I64Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.PromoteF32)), [Types.F32Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [Types.I32Type]));
-    (Some (Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [Types.I64Type])); ]
+  [ (Some (Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI32)), [Types.I32Type]));
+    (Some (Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI32)), [Types.I32Type]));
+    (Some (Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI64)), [Types.I64Type]));
+    (Some (Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI64)), [Types.I64Type]));
+    (Some (Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.PromoteF32)), [Types.F32Type]));
+    (Some (Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ReinterpretInt)), [Types.I64Type])); ]
 
 (** cvtop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let cvtop_gen con t_opt size = match t_opt with
@@ -162,6 +161,7 @@ let cvtop_gen con t_opt size = match t_opt with
   | Some Types.F64Type -> float64Op_cvtop_gen
   | None -> Gen.return None
 
+(*** Instructions list generator ***)
 (** instrs_rule : module_ -> value_type list -> value_type list -> int -> (instr list) option Gen.t *)
 let rec instrs_rule con input_ts output_ts size = 
     let recgen t_opt tr = Gen.(instr_rule con t_opt (size/2) >>= function
@@ -186,16 +186,15 @@ let rec instrs_rule con input_ts output_ts size =
 
 (** instr_rule : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 and instr_rule con t_opt size = match t_opt with
-    | None   -> let rules = [(1, nop_gen con t_opt size)] in
+    | None   -> let rules = [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size);] in
                   listPermuteTermGenInner con t_opt size rules
-      (*Gen.(oneof [ nop_gen con t_opt size ] )*)
     | Some _ -> match size with 
       | 0 -> let rules = [(1, const_gen con t_opt size)]; in
                   listPermuteTermGenInner con t_opt size rules
       | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
-                           (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); (1, nop_gen con t_opt size) ] in
+                           (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); 
+                           (1, nop_gen con t_opt size) ] in
                   listPermuteTermGenInner con t_opt size rules
-      (*Gen.(oneof [ const_gen con t_opt size; binop_gen con t_opt size; nop_gen con t_opt size ] ) *)
 
 and listPermuteTermGenInner con goal size rules =
   let rec removeAt n xs = match (n, xs) with

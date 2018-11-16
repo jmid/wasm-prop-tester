@@ -1,7 +1,4 @@
-
-
 open Wasm
-open Helper
 open QCheck
 open Instr_gen
 
@@ -153,7 +150,7 @@ let wasm_to_file m =
 ;;
 
 let arithmetic_spec_ast =
-  Test.make ~name:"Arithmetic expressions" ~count:100 
+  Test.make ~name:"Arithmetic expressions" ~count:1000 
   Instr_gen.arb_intsr
   (function
     | None    -> true

@@ -22,7 +22,8 @@ const program =
     + "     debug(m.exports.aexp());\n"
     + "} catch(e) {\n"
     + "     if (zero_div_re.exec(e.message)) debug('integer divide by zero')\n"
-    + "     if (zero_rem_re.exec(e.message)) debug('integer divide by zero')\n"
+    + "     else if (zero_rem_re.exec(e.message)) debug('integer divide by zero')\n"
+    + "     else debug(e.message)\n"
     + "}"
 
 console.log(program);
