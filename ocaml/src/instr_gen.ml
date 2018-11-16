@@ -48,6 +48,7 @@ and const_gen con t_opt size = match t_opt with
   | Some Types.I64Type -> Gen.map (fun i -> (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_int i)))), []))) Gen.nat
   | Some Types.F32Type -> Gen.map (fun i -> (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_float i)))), []))) Gen.float
   | Some Types.F64Type -> Gen.map (fun i -> (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_float i)))), []))) Gen.float
+  | None               -> Gen.return None
 
 (*** Unary operations *)
 (** intOp_unop_gen : IntOp.binop Gen.t *)
@@ -62,16 +63,19 @@ let floatOp_unop_gen = Gen.oneofl
 let int_unop_gen con t_opt size = match t_opt with
   | Some Types.I32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.I32 op)), [Types.I32Type;]))) intOp_unop_gen
   | Some Types.I64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.I64 op)), [Types.I64Type;]))) intOp_unop_gen
+  | Some _ | None -> Gen.return None
 
 (** float_unop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let float_unop_gen con t_opt size = match t_opt with
   | Some Types.F32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.F32 op)), [Types.F32Type;]))) floatOp_unop_gen
   | Some Types.F64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.F64 op)), [Types.F64Type;]))) floatOp_unop_gen
+  | Some _ | None -> Gen.return None
 
 (** unop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let unop_gen con t_opt size = match t_opt with
   | Some Types.I32Type | Some Types.I64Type -> int_unop_gen con t_opt size
   | Some Types.F32Type | Some Types.F64Type -> float_unop_gen con t_opt size
+  | None -> Gen.return None
 
 (*** Binary operations *)
 (** intOp_binop_gen : IntOp.unop Gen.t *)
@@ -87,16 +91,19 @@ let floatOp_binop_gen = Gen.oneofl
 let int_binop_gen con t_opt size = match t_opt with
   | Some Types.I32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Binary (Values.I32 op)), [Types.I32Type; Types.I32Type]))) intOp_binop_gen
   | Some Types.I64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Binary (Values.I64 op)), [Types.I64Type; Types.I64Type]))) intOp_binop_gen
+  | Some _ | None -> Gen.return None
 
 (** float_binop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let float_binop_gen con t_opt size = match t_opt with
   | Some Types.F32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Binary (Values.F32 op)), [Types.F32Type; Types.F32Type]))) floatOp_binop_gen
   | Some Types.F64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Binary (Values.F64 op)), [Types.F64Type; Types.F64Type]))) floatOp_binop_gen
+  | Some _ | None -> Gen.return None
 
 (** binop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let binop_gen con t_opt size = match t_opt with
   | Some Types.I32Type | Some Types.I64Type -> int_binop_gen con t_opt size
   | Some Types.F32Type | Some Types.F64Type -> float_binop_gen con t_opt size
+  | None -> Gen.return None
 
 (*** Test operations *)
 (** intOp_testop_gen : IntOp.testop Gen.t *)
@@ -107,11 +114,39 @@ let intOp_testop_gen = Gen.oneofl
 let int_testop_gen con t_opt size = match t_opt with
   | Some Types.I32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Test (Values.I32 op)), [Types.I32Type;]))) intOp_testop_gen
   | Some Types.I64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Test (Values.I64 op)), [Types.I32Type;]))) intOp_testop_gen
+  | Some _ | None -> Gen.return None
 
 (** testop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let testop_gen con t_opt size = match t_opt with
   | Some Types.I32Type | Some Types.I64Type -> int_testop_gen con t_opt size
-  | Some Types.F32Type | Some Types.F64Type -> Gen.return None
+  | Some _ | None -> Gen.return None
+
+(*** Relational operations *)
+(** intOp_relop_gen : IntOp.relop Gen.t *)
+let intOp_relop_gen = Gen.oneofl
+  [ Ast.IntOp.Eq; Ast.IntOp.Ne; Ast.IntOp.LtS; Ast.IntOp.LtU; Ast.IntOp.GtS; Ast.IntOp.GtU; Ast.IntOp.LeS; Ast.IntOp.LeU; Ast.IntOp.GeS; Ast.IntOp.GeU; ]
+
+(** floatOp_relop_gen : FloatOp.relop Gen.t *)
+let floatOp_relop_gen = Gen.oneofl
+  [ Ast.FloatOp.Eq; Ast.FloatOp.Ne; Ast.FloatOp.Lt; Ast.FloatOp.Gt; Ast.FloatOp.Le; Ast.FloatOp.Ge; ]
+
+(** int_relop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let int_relop_gen con t_opt size = match t_opt with
+  | Some Types.I32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Compare (Values.I32 op)), [Types.I32Type;]))) intOp_relop_gen
+  | Some Types.I64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Compare (Values.I64 op)), [Types.I32Type;]))) intOp_relop_gen
+  | Some _ | None -> Gen.return None
+
+(** float_relop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let float_relop_gen con t_opt size = match t_opt with
+  | Some Types.F32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Compare (Values.F32 op)), [Types.I32Type;]))) floatOp_relop_gen
+  | Some Types.F64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Compare (Values.F64 op)), [Types.I32Type;]))) floatOp_relop_gen
+  | Some _ | None -> Gen.return None
+
+(** relop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let relop_gen con t_opt size = match t_opt with
+  | Some Types.I32Type | Some Types.I64Type -> int_relop_gen con t_opt size
+  | Some Types.F32Type | Some Types.F64Type -> float_relop_gen con t_opt size
+  | None -> Gen.return None
 
 (** instrs_rule : module_ -> value_type list -> value_type list -> int -> (instr list) option Gen.t *)
 let rec instrs_rule con input_ts output_ts size = 
