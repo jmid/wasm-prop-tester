@@ -51,22 +51,12 @@ and const_gen con t_opt size = match t_opt with
 
 (** intOp_binop_gen : IntOp.binop Gen.t *)
 let intOp_binop_gen = Gen.oneofl
-	[
-    Ast.IntOp.Add;
-    Ast.IntOp.Sub;
-    Ast.IntOp.Mul;
-    Ast.IntOp.DivS;
-    Ast.IntOp.DivU;
-  ]
+  [ Ast.IntOp.Add; Ast.IntOp.Sub; Ast.IntOp.Mul; Ast.IntOp.DivS; Ast.IntOp.DivU; Ast.IntOp.RemS; Ast.IntOp.RemU; 
+    Ast.IntOp.And; Ast.IntOp.Or; Ast.IntOp.Xor; Ast.IntOp.Shl; Ast.IntOp.ShrU; Ast.IntOp.Rotl; Ast.IntOp.Rotr; ]
 
 (** floatOp_binop_gen : FloatOp.binop Gen.t *)
 let floatOp_binop_gen = Gen.oneofl
-	[
-    Ast.FloatOp.Add;
-    Ast.FloatOp.Sub;
-    Ast.FloatOp.Mul;
-    Ast.FloatOp.Div;
-  ]
+	[ Ast.FloatOp.Add; Ast.FloatOp.Sub; Ast.FloatOp.Mul; Ast.FloatOp.Div; Ast.FloatOp.Min; Ast.FloatOp.Max; Ast.FloatOp.CopySign; ]
 
 (** int_binop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
 let int_binop_gen con t_opt size = match t_opt with
@@ -141,9 +131,20 @@ let instr_to_string (instr : Ast.instr) =
     match instr' with
     | Ast.Const v   -> Values.string_of_value v.it ^ " "
     | Ast.Binary b  -> (match b with
-      | Values.I32 Ast.IntOp.Add -> "Add "
-      | Values.I32 Ast.IntOp.Sub -> "Sub "
-      | Values.I32 Ast.IntOp.Mul -> "Mul ")
+      | Values.I32 Ast.IntOp.Add  -> "Add "
+      | Values.I32 Ast.IntOp.Sub  -> "Sub "
+      | Values.I32 Ast.IntOp.Mul  -> "Mul "
+      | Values.I32 Ast.IntOp.DivS -> "DivS "
+      | Values.I32 Ast.IntOp.DivU -> "DivU "
+      | Values.I32 Ast.IntOp.RemS -> "RemS "
+      | Values.I32 Ast.IntOp.RemU -> "RemU "
+      | Values.I32 Ast.IntOp.And  -> "And "
+      | Values.I32 Ast.IntOp.Or   -> "Or "
+      | Values.I32 Ast.IntOp.Xor  -> "Xor "
+      | Values.I32 Ast.IntOp.Shl  -> "Shl "
+      | Values.I32 Ast.IntOp.ShrU -> "ShrU "
+      | Values.I32 Ast.IntOp.Rotl -> "Rotl "
+      | Values.I32 Ast.IntOp.Rotr -> "Rotr ")
     | Ast.Nop       -> "Nop "
     | _             -> ""
 ;;

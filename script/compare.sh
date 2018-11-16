@@ -34,10 +34,17 @@ v8 "$JS_FILE" > $TMP_V8 2>&1
 sm "$JS_FILE" > $TMP_SM 2>&1
 jsc "$JS_FILE" > $TMP_JSC 2>&1
 
-REF_CH="$(cmp $TMP_REF $TMP_CH)"
-CH_V8="$(cmp $TMP_CH $TMP_V8)"
-V8_SM="$(cmp $TMP_V8 $TMP_SM)"
-SM_JSC="$(cmp $TMP_SM $TMP_JSC)"
+cmp -s $TMP_REF $TMP_CH
+REF_CH=$?
+
+cmp -s $TMP_CH $TMP_V8
+CH_V8=$?
+
+cmp -s $TMP_V8 $TMP_SM
+V8_SM=$?
+
+cmp -s $TMP_SM $TMP_JSC
+SM_JSC=$?
 
 if [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] && [ "$V8_SM" = "$SM_JSC" ]
 then

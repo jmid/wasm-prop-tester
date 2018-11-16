@@ -12,6 +12,7 @@ const b = new Uint8Array(buf);
 
 const program = 
     "var zero_div_re = /(divi.*zero)|(zero.*divi)/i;"
+    + "var zero_rem_re = /(rem.*zero)|(zero.*rem)/i;"
     + "var debug = debug || (arg => console.log('-->', arg));"
     + "var buffer = new Uint8Array(\["
     + b.toString()
@@ -21,6 +22,7 @@ const program =
     + "     debug(m.exports.aexp());\n"
     + "} catch(e) {\n"
     + "     if (zero_div_re.exec(e.message)) debug('integer divide by zero')\n"
+    + "     if (zero_rem_re.exec(e.message)) debug('integer divide by zero')\n"
     + "}"
 
 console.log(program);
