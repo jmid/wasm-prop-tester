@@ -49,10 +49,33 @@ and const_gen con t_opt size = match t_opt with
   | Some Types.F32Type -> Gen.map (fun i -> (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_float i)))), []))) Gen.float
   | Some Types.F64Type -> Gen.map (fun i -> (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_float i)))), []))) Gen.float
 
-(** intOp_binop_gen : IntOp.binop Gen.t *)
+(** intOp_unop_gen : IntOp.binop Gen.t *)
+let intOp_unop_gen = Gen.oneofl
+  [ Ast.IntOp.Clz; Ast.IntOp.Ctz; Ast.IntOp.Popcnt; ]
+
+(** floatOp_unop_gen : FloatOp.unop Gen.t *)
+let floatOp_unop_gen = Gen.oneofl
+  [ Ast.FloatOp.Neg; Ast.FloatOp.Abs; Ast.FloatOp.Ceil; Ast.FloatOp.Floor; Ast.FloatOp.Trunc; Ast.FloatOp.Nearest; Ast.FloatOp.Sqrt; ]
+
+(** int_unop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let int_unop_gen con t_opt size = match t_opt with
+  | Some Types.I32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.I32 op)), [Types.I32Type;]))) intOp_unop_gen
+  | Some Types.I64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.I64 op)), [Types.I64Type;]))) intOp_unop_gen
+
+(** float_unop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let float_unop_gen con t_opt size = match t_opt with
+  | Some Types.F32Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.F32 op)), [Types.F32Type;]))) floatOp_unop_gen
+  | Some Types.F64Type -> Gen.map (fun op -> (Some (Helper.as_phrase (Ast.Unary (Values.F64 op)), [Types.F64Type;]))) floatOp_unop_gen
+
+(** unop_gen : module_ -> value_type option -> int -> (instr * value_type list) option Gen.t *)
+let unop_gen con t_opt size = match t_opt with
+  | Some Types.I32Type | Some Types.I64Type -> int_unop_gen con t_opt size
+  | Some Types.F32Type | Some Types.F64Type -> float_unop_gen con t_opt size
+
+(** intOp_binop_gen : IntOp.unop Gen.t *)
 let intOp_binop_gen = Gen.oneofl
   [ Ast.IntOp.Add; Ast.IntOp.Sub; Ast.IntOp.Mul; Ast.IntOp.DivS; Ast.IntOp.DivU; Ast.IntOp.RemS; Ast.IntOp.RemU; 
-    Ast.IntOp.And; Ast.IntOp.Or; Ast.IntOp.Xor; Ast.IntOp.Shl; Ast.IntOp.ShrU; Ast.IntOp.Rotl; Ast.IntOp.Rotr; ]
+    Ast.IntOp.And; Ast.IntOp.Or; Ast.IntOp.Xor; Ast.IntOp.Shl; Ast.IntOp.ShrS; Ast.IntOp.ShrU; Ast.IntOp.Rotl; Ast.IntOp.Rotr; ]
 
 (** floatOp_binop_gen : FloatOp.binop Gen.t *)
 let floatOp_binop_gen = Gen.oneofl
@@ -103,7 +126,7 @@ and instr_rule con t_opt size = match t_opt with
     | Some _ -> match size with 
       | 0 -> let rules = [(1, const_gen con t_opt size)]; in
                   listPermuteTermGenInner con t_opt size rules
-      | n -> let rules = [ (1, const_gen con t_opt size); (9, binop_gen con t_opt size); (1, nop_gen con t_opt size) ] in
+      | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); (1, nop_gen con t_opt size) ] in
                   listPermuteTermGenInner con t_opt size rules
       (*Gen.(oneof [ const_gen con t_opt size; binop_gen con t_opt size; nop_gen con t_opt size ] ) *)
 
@@ -142,6 +165,7 @@ let instr_to_string (instr : Ast.instr) =
       | Values.I32 Ast.IntOp.Or   -> "Or "
       | Values.I32 Ast.IntOp.Xor  -> "Xor "
       | Values.I32 Ast.IntOp.Shl  -> "Shl "
+      | Values.I32 Ast.IntOp.ShrS -> "ShrS "
       | Values.I32 Ast.IntOp.ShrU -> "ShrU "
       | Values.I32 Ast.IntOp.Rotl -> "Rotl "
       | Values.I32 Ast.IntOp.Rotr -> "Rotr ")
