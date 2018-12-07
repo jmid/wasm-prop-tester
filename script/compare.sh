@@ -38,11 +38,11 @@ then
     exit "$ERROR"
 fi
 
-wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> >(sed "s/.*\(integer divide by zero\)/--> \1/") | sed "s/\(-\?[0-9]\+\).*/--> \1/" > $TMP_REF
-ch "$JS_FILE" > $TMP_CH 2>&1
-v8 "$JS_FILE" > $TMP_V8 2>&1
-sm "$JS_FILE" > $TMP_SM 2>&1
-jsc "$JS_FILE" > $TMP_JSC 2>&1
+timeout 60 wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> >(sed "s/.*\(integer divide by zero\)/--> \1/") | sed "s/\(-\?[0-9]\+\).*/--> \1/" > $TMP_REF
+timeout 60 ch "$JS_FILE" > $TMP_CH 2>&1
+timeout 60 v8 "$JS_FILE" > $TMP_V8 2>&1
+timeout 60 sm "$JS_FILE" > $TMP_SM 2>&1
+timeout 60 jsc "$JS_FILE" > $TMP_JSC 2>&1
 
 cmp -s $TMP_REF $TMP_CH
 REF_CH=$?
@@ -56,7 +56,7 @@ V8_SM=$?
 cmp -s $TMP_SM $TMP_JSC
 SM_JSC=$?
 
-if [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] && [ "$V8_SM" = "$SM_JSC" ]
+if [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] && [ "$V8_SM" = "$SM_JSC" ] && [ "$V8_SM" != 1 ]
 then
     # rm $TMP_DIR/tmp_*
     # rmdir "$TMP_DIR"
