@@ -124,66 +124,26 @@ and select_gen con t_opt size = match t_opt with
 (*** Const ***)
 (** const_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
 and const_gen con t_opt size = match t_opt with
-  | Some Types.I32Type -> Gen.( frequency [
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x7fffffff)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x80000000)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x80000001)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x3fffffff)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x01234567)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x8ff00ff0)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x40000000)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0xabcd9876)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0xfe00dc00)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0xb0c1d2e3)))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int 0x769abcdf)))), []));
+  | Some Types.I32Type -> Gen.( oneofl [ "0x7fffffff"; "0x80000000"; "0x80000001"; "0x3fffffff"; "0x01234567"; "0x8ff00ff0"; 
+        "0x40000000"; "0xabcd9876"; "0xfe00dc00"; "0xb0c1d2e3"; "0x769abcdf"]
+    >>= fun s -> frequency [
+    11, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_string s)))), []));
     2, (small_int  >>= fun i -> return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), []))) ])
-  | Some Types.I64Type -> Gen.(frequency [ 
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x7fffffffffffffff")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x8000000000000000")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x3fffffff")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x0123456789abcdef")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x8ff00ff00ff00ff0")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0xf0f0ffff")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x4000000000000000")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0xabcd1234ef567809")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0xabd1234ef567809c")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0xabcd987602468ace")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0xfe000000dc000000")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x00008000")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x00010000")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0xAAAAAAAA55555555")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0x99999999AAAAAAAA")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string "0xDEADBEEFDEADBEEF")))), []));
+  | Some Types.I64Type -> Gen.( oneofl [ "0x7fffffffffffffff"; "0x8000000000000000"; "0x3fffffff"; "0x0123456789abcdef"; "0x8ff00ff00ff00ff0";
+        "0xf0f0ffff"; "0x4000000000000000"; "0xabcd1234ef567809"; "0xabd1234ef567809c"; "0xabcd987602468ace"; "0xfe000000dc000000"; "0x00008000"; 
+        "0x00010000"; "0xAAAAAAAA55555555"; "0x99999999AAAAAAAA"; "0xDEADBEEFDEADBEEF"]
+    >>= fun s -> frequency [ 
+    16, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string s)))), []));
     2, (int >>= fun i -> return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_int i)))), []))) ])
-  | Some Types.F32Type -> Gen.(frequency [
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "0x0p+0")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "-0x0p+0")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "0x1p-149")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "-0x1p-149")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "0x1p-126")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "-0x1p-126")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "0x1.921fb6p+2")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "-0x1.921fb6p+2")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "0x1.fffffep+127")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "-0x1.fffffep+127")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "inf")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string "-inf")))), []));
+  | Some Types.F32Type -> Gen.( oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126"; "-0x1p-126"; 
+        "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127"; "-0x1.fffffep+127"]
+    >>= fun s -> frequency [
+    12, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string s)))), []));
     2, (float >>= fun i -> return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_float i)))), []))) ])
-  | Some Types.F64Type -> Gen.(frequency [
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "0x0p+0")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "-0x0p+0")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "0x0.0000000000001p-1022")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "-0x0.0000000000001p-1022")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "0x1p-1022")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "-0x1p-1022")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "0x1p-1")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "-0x1p-1")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "0x1.921fb54442d18p+2")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "-0x1.921fb54442d18p+2")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "0x1.fffffffffffffp+1023")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "-0x1.fffffffffffffp+1023")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "inf")))), []));
-    1, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string "-inf")))), []));
+  | Some Types.F64Type -> Gen.( oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1"; "-0x1p-1"; 
+        "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022"; "0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2"; "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"]
+    >>= fun s -> frequency [
+    14, return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string s)))), []));
     2, (float      >>= fun i -> return (Some (Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_float i)))), [])))   ])
   | None               -> Gen.return None
 
@@ -358,6 +318,18 @@ and teelocal_gen (con: context_) t_opt size = match t_opt with
     | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
     | None    -> Gen.return None )
   | None -> Gen.return None
+
+
+
+
+
+
+
+
+
+
+
+
 
 (*** Statistics ***)
 let length_stat list_opt = match list_opt with
