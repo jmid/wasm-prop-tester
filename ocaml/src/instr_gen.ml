@@ -2,7 +2,8 @@ open Wasm
 open QCheck
 
 type context_ = {
-  locals : Types.stack_type;
+  locals: Types.stack_type;
+  globals: Types.stack_type;
 }
 
 (*
@@ -294,30 +295,47 @@ and if_gen con t_opt size =
     | Some t -> if_gen [t]
     | None   -> if_gen []
 
-(*** Getlocal ***)
-(** getlocal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
-and getlocal_gen (con: context_) t_opt size = match t_opt with
+(*** GetLocal ***)
+(** getLocal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
+and getLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (match Helper.get_indexes t con.locals with
     | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [])) )
     | None    -> Gen.return None )
   | None -> Gen.return None
 
-(*** Setlocal ***)
-(** setlocal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
-and setlocal_gen (con: context_) t_opt size = match t_opt with
+(*** SetLocal ***)
+(** setLocal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
+and setLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> Gen.( oneofl con.locals >>= 
     fun t -> (match Helper.get_indexes t con.locals with
                 | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (Helper.as_phrase (Ast.SetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
                 | None    -> Gen.return None ))
 
-(*** Teelocal ***)
-(** teelocal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
-and teelocal_gen (con: context_) t_opt size = match t_opt with
+(*** TeeLocal ***)
+(** teeLocal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
+and teeLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (match Helper.get_indexes t con.locals with
     | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
     | None    -> Gen.return None )
   | None -> Gen.return None
+
+(*** GetGlobal ***)
+(** getGlobal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
+and getGlobal_gen (con: context_) t_opt size = match t_opt with
+  | Some t -> (match Helper.get_indexes t con.globals with
+    | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (Helper.as_phrase (Ast.GetGlobal (Helper.as_phrase (Int32.of_int i))), [])) )
+    | None    -> Gen.return None )
+  | None -> Gen.return None
+
+(*** SetGlobal ***)
+(** setGlobal_gen : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
+and setGlobal_gen (con: context_) t_opt size = match t_opt with
+  | Some t -> Gen.return None
+  | None -> Gen.( oneofl con.globals >>= 
+    fun t -> (match Helper.get_indexes t con.globals with
+                | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (Helper.as_phrase (Ast.SetGlobal (Helper.as_phrase (Int32.of_int i))), [t])) )
+                | None    -> Gen.return None ))
 
 
 
@@ -360,6 +378,7 @@ let rec drop_stat list_opt = match list_opt with
 
 let context = {
   locals = [Types.I32Type; Types.F32Type];
+  globals = [];
 }
 
 let instr_gen = Gen.sized (fun n -> instrs_rule context [] [Types.I32Type] n)
