@@ -2,7 +2,7 @@ open Wasm
 open QCheck
 
 type context_ = {
-  labels: Types.stack_type;
+  labels: (Types.value_type option) list;
   locals: Types.stack_type;
   globals: Types.stack_type;
 }
@@ -330,8 +330,8 @@ and block_gen (con: context_) t_opt size =
   let block_instr t = Gen.(
     instrs_rule con [] t size >>= 
       fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (t, instrs)), []))
-        | None        -> return (Some (con, Helper.as_phrase (Ast.Block (t, [])), [])) ) in
+        | Some instrs -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Block (t, instrs)), []))
+        | None        -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Block (t, [])), [])) ) in
   match t_opt with
   | Some t -> block_instr [t]
   | None   -> block_instr []
@@ -342,8 +342,8 @@ and loop_gen (con: context_) t_opt size =
   let loop_instr t = Gen.(
     instrs_rule con [] t size >>= 
       fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (t, instrs)), []))
-        | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (t, [])), [])) ) in
+        | Some instrs -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Loop (t, instrs)), []))
+        | None        -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Loop (t, [])), [])) ) in
   match t_opt with
   | Some t -> loop_instr [t]
   | None   -> loop_instr []
@@ -360,7 +360,7 @@ and if_gen (con: context_) t_opt size =
         and instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some (con, Helper.as_phrase (Ast.If (t, instrs1, instrs2)), [Types.I32Type])) ) in
+        return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.If (t, instrs1, instrs2)), [Types.I32Type])) ) in
   match t_opt with
     | Some t -> if_gen [t]
     | None   -> if_gen []
