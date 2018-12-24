@@ -35,10 +35,16 @@ let types_ = [
   as_phrase (Types.FuncType ([], [Types.F64Type]))
 ];;
 
-(** get_indexes: a' -> a list -> (int list) option **)
-let get_indexes a l = if List.mem a l then
-    let rec get_index a' l' i = match List.nth_opt l' i with
-      | Some e  -> if a' = e then i::(get_index a' l' (i+1)) else get_index a' l' (i+1)
-      | None    -> [] in
-    Some (get_index a l 0)
-  else None
+(** get_indexes: a' -> a list -> int list **)
+let get_indexes a l =
+  let rec get_index a' l' i = match List.nth_opt l' i with
+    | Some e  -> if a' = e then i::(get_index a' l' (i+1)) else get_index a' l' (i+1)
+    | None    -> [] in
+  get_index a l 0
+
+(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
+let get_indexes_and_inputs a l =
+  let rec get_index a' l' i = match List.nth_opt l' i with
+    | Some (e, t)  -> if a' = e then (i,t)::(get_index a' l' (i+1)) else get_index a' l' (i+1)
+    | None       -> [] in
+  get_index a l 0

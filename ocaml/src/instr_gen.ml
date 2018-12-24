@@ -2,7 +2,7 @@ open Wasm
 open QCheck
 
 type context_ = {
-  labels: (Types.value_type option) list;
+  labels: (Types.value_type option * Types.stack_type) list;
   locals: Types.stack_type;
   globals: Types.stack_type;
 }
@@ -19,8 +19,6 @@ let addLabel t_option con =
 type instr = instr' Source.phrase
 and instr' =
   | Unreachable                       (* trap unconditionally *)
-  | Br of var                         (* break to n-th surrounding label *)
-  | BrIf of var                       (* conditional break *)
   | BrTable of var list * var         (* indexed break *)
   | Return                            (* break from function body *)
   | Call of var                       (* call function *)
@@ -29,6 +27,10 @@ and instr' =
   | Store of storeop                  (* write memory at address *)
   | MemorySize                        (* size of linear memory *)
   | MemoryGrow                        (* grow linear memory *)
+
+
+  | Br of var                         (* break to n-th surrounding label *)
+  | BrIf of var                       (* conditional break *)
 
 
   | GetLocal of var                   (* read local variable *)
@@ -268,8 +270,8 @@ and select_gen con t_opt size = match t_opt with
 (** getLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and getLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (match Helper.get_indexes t con.locals with
-    | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [])) )
-    | None    -> Gen.return None )
+    | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [])) )
+    | []    -> Gen.return None )
   | None -> Gen.return None
 
 (*** SetLocal ***)
@@ -278,23 +280,23 @@ and setLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> Gen.( oneofl con.locals >>= 
     fun t -> (match Helper.get_indexes t con.locals with
-                | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
-                | None    -> Gen.return None ))
+                | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
+                | []    -> Gen.return None ))
 
 (*** TeeLocal ***)
 (** teeLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and teeLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (match Helper.get_indexes t con.locals with
-    | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
-    | None    -> Gen.return None )
+    | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
+    | []    -> Gen.return None )
   | None -> Gen.return None
 
 (*** GetGlobal ***)
 (** getGlobal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and getGlobal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (match Helper.get_indexes t con.globals with
-    | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetGlobal (Helper.as_phrase (Int32.of_int i))), [])) )
-    | None    -> Gen.return None )
+    | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetGlobal (Helper.as_phrase (Int32.of_int i))), [])) )
+    | []    -> Gen.return None )
   | None -> Gen.return None
 
 (*** SetGlobal ***)
@@ -303,8 +305,8 @@ and setGlobal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> Gen.( oneofl con.globals >>= 
     fun t -> (match Helper.get_indexes t con.globals with
-                | Some l  -> Gen.( oneofl l >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetGlobal (Helper.as_phrase (Int32.of_int i))), [t])) )
-                | None    -> Gen.return None ))
+                | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetGlobal (Helper.as_phrase (Int32.of_int i))), [t])) )
+                | []    -> Gen.return None ))
 
 (**** Memory Instructions ****)
 
@@ -330,8 +332,8 @@ and block_gen (con: context_) t_opt size =
   let block_instr t = Gen.(
     instrs_rule con [] t size >>= 
       fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Block (t, instrs)), []))
-        | None        -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Block (t, [])), [])) ) in
+        | Some instrs -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Block (t, instrs)), []))
+        | None        -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Block (t, [])), [])) ) in
   match t_opt with
   | Some t -> block_instr [t]
   | None   -> block_instr []
@@ -342,8 +344,8 @@ and loop_gen (con: context_) t_opt size =
   let loop_instr t = Gen.(
     instrs_rule con [] t size >>= 
       fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Loop (t, instrs)), []))
-        | None        -> return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.Loop (t, [])), [])) ) in
+        | Some instrs -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Loop (t, instrs)), []))
+        | None        -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Loop (t, [])), [])) ) in
   match t_opt with
   | Some t -> loop_instr [t]
   | None   -> loop_instr []
@@ -360,11 +362,17 @@ and if_gen (con: context_) t_opt size =
         and instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some ((addLabel t_opt con), Helper.as_phrase (Ast.If (t, instrs1, instrs2)), [Types.I32Type])) ) in
+        return (Some ((addLabel ((Some Types.I32Type), t) con), Helper.as_phrase (Ast.If (t, instrs1, instrs2)), [Types.I32Type])) ) in
   match t_opt with
     | Some t -> if_gen [t]
     | None   -> if_gen []
 
+(*** Br ***)
+(** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and br_gen (con: context_) t_opt size = 
+  match Helper.get_indexes_and_inputs t_opt con.labels with
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,t) -> return (Some (con, Helper.as_phrase (Ast.Br (Helper.as_phrase (Int32.of_int i))), t)) )
+    | []    -> Gen.return None
 
 
 
