@@ -125,7 +125,7 @@ and const_gen con t_opt size = match t_opt with
     >>= fun s -> frequency [
     11, return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_string s)))), []));
     2, (small_int  >>= fun i -> return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), []))) ])
-  | Some Types.I64Type -> Gen.( oneofl [ "0x7fffffffffffffff"; "0x8000000000000000"; "0x3fffffff"; "0x0123456789abcdef"; "0x8ff00ff00ff00ff0";
+  | Some Types.I64Type -> Gen.( oneofl [ (*"0x7fffffffffffffff";*) "0x8000000000000000"; "0x3fffffff"; "0x0123456789abcdef"; "0x8ff00ff00ff00ff0";
         "0xf0f0ffff"; "0x4000000000000000"; "0xabcd1234ef567809"; "0xabd1234ef567809c"; "0xabcd987602468ace"; "0xfe000000dc000000"; "0x00008000"; 
         "0x00010000"; "0xAAAAAAAA55555555"; "0x99999999AAAAAAAA"; "0xDEADBEEFDEADBEEF"]
     >>= fun s -> frequency [ 
@@ -310,7 +310,7 @@ and setGlobal_gen (con: context_) t_opt size = match t_opt with
 
 (**** Memory Instructions ****)
 
-(** TODO*)
+(** TODO **)
 
 (**** Control Instructions ****)
 
