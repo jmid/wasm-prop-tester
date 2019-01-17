@@ -12,3 +12,5 @@
 *.mlpack
 ocaml/_build
 ocaml/tmp
+ocaml/coverage
+bisect*
