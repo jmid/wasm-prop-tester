@@ -452,6 +452,15 @@ and brif_gen (con: context_) t_opt size =
     | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::tlist)) )
     | []    -> Gen.return None
 
+(*** BrTable ***)
+(** brtable_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and brtable_gen (con: context_) t_opt size = 
+  match Helper.get_indexes_and_inputs t_opt con.labels with
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> 
+      list (oneofl (e::es) >>= fun (i',tlist') -> return (Helper.as_phrase (Int32.of_int i'))) >>= fun ilist ->
+        return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::tlist)) )
+    | []    -> Gen.return None
+
 (*** Return ***)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and return_gen (con: context_) t_opt size = match con.return with
