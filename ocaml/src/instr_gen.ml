@@ -9,17 +9,15 @@ let addLabel t_option con =
     globals = con.globals;
     funcs = con.funcs;
     mems = con.mems;
+    return = con.return;
+    tables = con.tables;
   } in
   con'
 
 (*
 type instr = instr' Source.phrase
 and instr' =
-  | Unreachable                       (* trap unconditionally *)
   | BrTable of var list * var         (* indexed break *)
-  | Return                            (* break from function body *)
-  | Call of var                       (* call function *)
-  | CallIndirect of var               (* call function through table *)
 
 
   | Load of loadop                    (* read memory at address *)
@@ -37,6 +35,14 @@ and instr' =
   | GetGlobal of var                  (* read global variable *)
   | SetGlobal of var                  (* write global variable *)
   
+
+  | Unreachable                       (* trap unconditionally *)
+  | Return                            (* break from function body *)
+
+
+  | Call of var                       (* call function *)
+  | CallIndirect of var               (* call function through table *)
+
 
   | Nop                               (* do nothing *)
   | Drop                              (* forget a value *)
@@ -311,21 +317,11 @@ and setGlobal_gen (con: context_) t_opt size = match t_opt with
 
 (**** Memory Instructions ****)
 
-(** TODO **)
-
-(** align_store_gen **)
-and align_store_gen t p_opt = 
-  let width = match p_opt with
-    | Some p -> Memory.packed_size p
-    | None   -> Types.size t
-  in
-  Gen.(int_range 1 width >>= fun i -> return i)
-
 (** align_load_gen **)
 and align_load_gen t p_opt = 
   let width = match p_opt with
     | Some (p,_) -> Memory.packed_size p
-    | None     -> Types.size t
+    | None       -> Types.size t
   in
   Gen.(int_range 1 width >>= fun i -> return i)
 
@@ -346,6 +342,14 @@ and load_gen con t_opt size = match t_opt with
         } in
         return (Some (con, Helper.as_phrase (Ast.Load mop), [Types.I32Type; t])))
   | None   -> Gen.return None
+
+(** align_store_gen **)
+and align_store_gen t p_opt = 
+  let width = match p_opt with
+    | Some p -> Memory.packed_size p
+    | None   -> Types.size t
+  in
+  Gen.(int_range 1 width >>= fun i -> return i)
 
 (*** Store ***)
 (** store_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -438,22 +442,35 @@ and if_gen (con: context_) t_opt size =
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and br_gen (con: context_) t_opt size = 
   match Helper.get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,t) -> return (Some (con, Helper.as_phrase (Ast.Br (Helper.as_phrase (Int32.of_int i))), t)) )
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.Br (Helper.as_phrase (Int32.of_int i))), tlist)) )
     | []    -> Gen.return None
 
 (*** BrIf ***)
 (** brif_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brif_gen (con: context_) t_opt size = 
   match Helper.get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,t) -> return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::t)) )
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::tlist)) )
     | []    -> Gen.return None
 
+(*** Return ***)
+(** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and return_gen (con: context_) t_opt size = match con.return with
+  | Some t -> Gen.return (Some (con, Helper.as_phrase (Ast.Return, [t])))
+  | None   -> Gen.return (Some (con, Helper.as_phrase (Ast.Return, [])))
 
+(*** Call ***)
+(** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and call_gen (con: context_) t_opt size = 
+  match Helper.get_indexes_and_inputs t_opt con.funcs with
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), tlist)) )
+    | []    -> Gen.return None
 
-
-
-
-
+(*** CallIndirect ***)
+(** callindirect_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and callindirect_gen (con: context_) t_opt size = 
+  match Helper.get_indexes_and_inputs t_opt con.tables with
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.CallIndirect (Helper.as_phrase (Int32.of_int i))), tlist)) )
+    | []    -> Gen.return None
 
 
 

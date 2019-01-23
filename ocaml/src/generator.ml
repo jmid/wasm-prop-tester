@@ -130,7 +130,17 @@ let context = {
   globals = [];
   funcs = [];
   mems = [];
+  return = None;
+  tables = [];
 }
+;;
+
+(** value_type_opt_gen : value_type option **)
+let value_type_opt_gen = Gen.(
+  frequency [ 
+    1, return None; 
+    3, (oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> return (Some t)) 
+  ] >>= fun t_opt -> return t_opt)
 ;;
 
 (** stack_type_gen : int -> value_type list **)
@@ -139,7 +149,7 @@ let stack_type_gen n = Gen.(list_repeat n (oneofl [Types.I32Type; Types.I64Type;
 
 (** func_type_gen : func_type **)
 let func_type_gen = Gen.(small_int >>= fun n -> 
-  pair (stack_type_gen n) (stack_type_gen 1) >>= fun (s_t', s_t'') -> return (Types.FuncType (s_t', s_t'')))
+  pair (value_type_opt_gen) (stack_type_gen n) >>= fun (v_t, s_t) -> return (v_t, s_t))
 ;;
 
 (** func_type_list_gen : func_type list **)
@@ -154,6 +164,8 @@ let context_gen =
       globals = [];
       funcs = funcs;
       mems = [];
+      return = None;
+      tables = [];
     }
   )
 

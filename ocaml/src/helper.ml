@@ -2,11 +2,14 @@ open Wasm
 open QCheck
 
 type context_ = {
+          (* (result, inputs) list *)
   labels: (Types.value_type option * Types.stack_type) list;
+  funcs: (Types.value_type option * Types.stack_type) list;
+  tables: (Types.value_type option * Types.stack_type) list;
   locals: Types.stack_type;
   globals: Types.stack_type;
-  funcs: Types.func_type list;
   mems: Types.memory_type list;
+  return: Types.value_type option;
 }
 
 let string_to_name s =
