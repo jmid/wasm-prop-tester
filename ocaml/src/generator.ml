@@ -1,6 +1,7 @@
 open Wasm
 open QCheck
 open Instr_gen
+open Helper
 
 let tmp_dir_name = "tmp";;
 
@@ -102,43 +103,17 @@ let arithmetic_ast =
 ;;
 *)
 
-let types_ = [ 
-  Helper.as_phrase (Types.FuncType ([], [Types.I32Type]));
-  Helper.as_phrase (Types.FuncType ([], [Types.I64Type]));
-  Helper.as_phrase (Types.FuncType ([], [Types.F32Type]));
-  Helper.as_phrase (Types.FuncType ([], [Types.F64Type]))
-];;
-
-
 let string_to_name s =
   let rec exp i l =
     if i < 0 then l else exp (i - 1) (Char.code(s.[i]) :: l) in
   exp (String.length s - 1) []
 ;;
 
-let get_module types funcs = {
-  Ast.types = types;
-  Ast.globals = [];
-  Ast.tables = [];
-  Ast.memories = [];
-  Ast.funcs = funcs;
-  Ast.start = None;
-  Ast.elems  = [];
-  Ast.data = [];
-  Ast.imports = [];
-  Ast.exports = [
-    Helper.as_phrase ({
-      Ast.name = string_to_name "aexp";
-      Ast.edesc = Helper.as_phrase (Ast.FuncExport (Helper.as_phrase 0l));
-    })
-  ];
-}
-;;
-
 let get_func body = 
   {
-    Ast.ftype = Helper.as_phrase 0l;
-    Ast.locals = [];
+    Ast.ftype = as_phrase 0l;
+    (*Ast.locals = [];*)
+    Ast.locals = [Types.I32Type; Types.F32Type];
     Ast.body = body;
   }
 ;;
@@ -149,14 +124,68 @@ let wasm_to_file m =
     close_out oc
 ;;
 
+let context = {
+  labels = [];
+  locals = [Types.I32Type; Types.F32Type];
+  globals = [];
+  funcs = [];
+  mems = [];
+}
+;;
+
+(** stack_type_gen : int -> value_type list **)
+let stack_type_gen n = Gen.(list_repeat n (oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> return t))
+;;
+
+(** func_type_gen : func_type **)
+let func_type_gen = Gen.(small_int >>= fun n -> 
+  pair (stack_type_gen n) (stack_type_gen 1) >>= fun (s_t', s_t'') -> return (Types.FuncType (s_t', s_t'')))
+;;
+
+(** func_type_list_gen : func_type list **)
+let func_type_list_gen = Gen.(list func_type_gen)
+;;
+
+let context_gen = 
+  Gen.(func_type_list_gen >>= fun funcs ->
+    return {
+      labels = [];
+      locals = [];
+      globals = [];
+      funcs = funcs;
+      mems = [];
+    }
+  )
+
+let module_gen = Gen.(context_gen >>= fun con -> 
+  Instr_gen.instr_gen con >>= fun inst_list -> return inst_list
+)
+
+let arb_module = make ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)] module_gen
+
 let arithmetic_spec_ast =
-  Test.make ~name:"Arithmetic expressions" ~count:1000 
-  Instr_gen.arb_intsr
+  Test.make ~name:"Arithmetic expressions" ~count:10 
+  arb_module
   (function
     | None    -> true
     | Some e  ->
-      let empty = get_module types_ [Helper.as_phrase (get_func e)] in
-        let empty_module = Helper.as_phrase (empty) in
+      let empty = get_module types_ [as_phrase (get_func e)] in
+        let empty_module = as_phrase (empty) in
+          let arrange_m = Arrange.module_ empty_module in
+            wasm_to_file arrange_m
+      ;
+      Sys.command ("../script/compare.sh " ^ file_name) = 0
+  )
+;;
+
+let module_test =
+  Test.make ~name:"Arithmetic expressions" ~count:10 
+  (Instr_gen.arb_intsr context)
+  (function
+    | None    -> true
+    | Some e  ->
+      let empty = get_module types_ [as_phrase (get_func e)] in
+        let empty_module = as_phrase (empty) in
           let arrange_m = Arrange.module_ empty_module in
             wasm_to_file arrange_m
       ;
@@ -165,9 +194,19 @@ let arithmetic_spec_ast =
 ;;
 
 QCheck_runner.set_seed(401353417);;
-QCheck_runner.run_tests ~verbose:true [ arithmetic_spec_ast; ] ;;
+QCheck_runner.run_tests ~verbose:true [ arithmetic_spec_ast; (*module_test;*) ] ;;
 
 (*
 
 QCheck_runner.run_tests ~verbose:true [ arithmetic_ast; arithmetic_spec_ast; ] ;;
+*)
+(*
+
+let f = F32.of_float (-1.0)
+let s = F32.sqrt f
+
+;;
+
+print_endline (F32.to_string s)
+ 
 *)

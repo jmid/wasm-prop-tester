@@ -1,5 +1,14 @@
 open Wasm
-    
+open QCheck
+
+type context_ = {
+  labels: (Types.value_type option * Types.stack_type) list;
+  locals: Types.stack_type;
+  globals: Types.stack_type;
+  funcs: Types.func_type list;
+  mems: Types.memory_type list;
+}
+
 let string_to_name s =
   let rec exp i l =
     if i < 0 then l else exp (i - 1) (Char.code(s.[i]) :: l) in

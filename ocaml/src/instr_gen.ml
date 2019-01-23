@@ -1,17 +1,14 @@
 open Wasm
 open QCheck
-
-type context_ = {
-  labels: (Types.value_type option * Types.stack_type) list;
-  locals: Types.stack_type;
-  globals: Types.stack_type;
-}
+open Helper
 
 let addLabel t_option con =
   let con' = {
     labels = t_option::con.labels;
     locals = con.locals;
     globals = con.globals;
+    funcs = con.funcs;
+    mems = con.mems;
   } in
   con'
 
@@ -23,19 +20,18 @@ and instr' =
   | Return                            (* break from function body *)
   | Call of var                       (* call function *)
   | CallIndirect of var               (* call function through table *)
+
+
   | Load of loadop                    (* read memory at address *)
   | Store of storeop                  (* write memory at address *)
+
+
   | MemorySize                        (* size of linear memory *)
   | MemoryGrow                        (* grow linear memory *)
 
 
   | Br of var                         (* break to n-th surrounding label *)
   | BrIf of var                       (* conditional break *)
-
-
-  | GetLocal of var                   (* read local variable *)
-  | SetLocal of var                   (* write local variable *)
-  | TeeLocal of var                   (* write local variable and keep value *)
 
 
   | GetGlobal of var                  (* read global variable *)
@@ -54,6 +50,9 @@ and instr' =
   | Block of stack_type * instr list  (* execute in sequence *)
   | Loop of stack_type * instr list   (* loop header *)
   | If of stack_type * instr list * instr list  (* conditional *)
+  | GetLocal of var                   (* read local variable *)
+  | SetLocal of var                   (* write local variable *)
+  | TeeLocal of var                   (* write local variable and keep value *)
 *)
 
 (*** Instructions list generator ***)
@@ -314,6 +313,72 @@ and setGlobal_gen (con: context_) t_opt size = match t_opt with
 
 (** TODO **)
 
+(** align_store_gen **)
+and align_store_gen t p_opt = 
+  let width = match p_opt with
+    | Some p -> Memory.packed_size p
+    | None   -> Types.size t
+  in
+  Gen.(int_range 1 width >>= fun i -> return i)
+
+(** align_load_gen **)
+and align_load_gen t p_opt = 
+  let width = match p_opt with
+    | Some (p,_) -> Memory.packed_size p
+    | None     -> Types.size t
+  in
+  Gen.(int_range 1 width >>= fun i -> return i)
+
+(*** Load ***)
+(** load_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and load_gen con t_opt size = match t_opt with
+  | Some t -> Gen.(oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t ->
+    frequency [ 
+      1, return None; 
+      3, pair (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32]) (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) -> return (Some (p, sx)) 
+    ] >>= fun p_opt ->
+      pair (align_load_gen t p_opt) (ui32)  >>= fun (align, offset) ->
+        let mop = {
+          Ast.ty = t; 
+          Ast.align = align; 
+          Ast.offset = offset; 
+          Ast.sz = p_opt
+        } in
+        return (Some (con, Helper.as_phrase (Ast.Load mop), [Types.I32Type; t])))
+  | None   -> Gen.return None
+
+(*** Store ***)
+(** store_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and store_gen con t_opt size = match t_opt with
+  | Some _ -> Gen.return None
+  | None   -> Gen.(oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t ->
+    frequency [ 1, return None; 3, (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
+      pair (align_store_gen t p_opt) (ui32) >>= fun (align, offset) ->
+        let mop = {
+          Ast.ty = t; 
+          Ast.align = align; 
+          Ast.offset = offset; 
+          Ast.sz = p_opt
+        } in
+        return (Some (con, Helper.as_phrase (Ast.Store mop), [Types.I32Type; t])))
+    
+
+(*** MemorySize ***)
+(** memorysize_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and memorysize_gen con t_opt size = match t_opt with
+  | Some Types.I32Type  -> (match con.mems with
+    | [] -> Gen.return None
+    | _  -> Gen.return (Some (con, Helper.as_phrase (Ast.MemorySize), [])))
+  | Some _ | None       -> Gen.return None
+
+(*** MemoryGrow ***)
+(** memorygrow_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and memorygrow_gen con t_opt size = match t_opt with
+  | Some Types.I32Type  -> (match con.mems with
+    | [] -> Gen.return None
+    | _  -> Gen.return (Some (con, Helper.as_phrase (Ast.MemoryGrow), [Types.I32Type])))
+  | Some _ | None       -> Gen.return None
+
 (**** Control Instructions ****)
 
 (*** Nop ***)
@@ -422,15 +487,9 @@ let rec drop_stat list_opt = match list_opt with
           | Ast.Drop      -> 1 + (nop_stat (Some (es)))
           | _             -> 0 + (nop_stat (Some (es)))
 
-let context = {
-  labels = [];
-  locals = [Types.I32Type; Types.F32Type];
-  globals = [];
-}
+let instr_gen context = Gen.sized (fun n -> instrs_rule context [] [Types.I32Type] n)
 
-let instr_gen = Gen.sized (fun n -> instrs_rule context [] [Types.I32Type] n)
-
-let arb_intsr = make ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)] instr_gen
+let arb_intsr context = make ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)] (instr_gen context)
 
 
 
