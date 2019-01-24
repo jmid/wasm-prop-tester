@@ -93,13 +93,13 @@ and instr_rule con t_opt size = match t_opt with
     | Some _ -> (match size with 
       | 0 -> let rules = [(1, const_gen con t_opt size)]; in
                   listPermuteTermGenInner con t_opt size rules
-      | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
-                           (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); 
+      | n -> let rules = [ (1, const_gen con t_opt size); (*(9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
+                           (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);*) (9, cvtop_gen con t_opt size); 
                            (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
                            (1, if_gen con t_opt size); (1, select_gen con t_opt size); (*(11, getLocal_gen con t_opt size);
                            (11, setLocal_gen con t_opt size); (11, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
                            (11, setGlobal_gen con t_opt size); (11, unreachable_gen con t_opt size); (11, return_gen con t_opt size);*)
-                           (11, br_gen con t_opt size);] in
+                           (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);(**)] in
                   listPermuteTermGenInner con t_opt size rules)
 
 and listPermuteTermGenInner con goal size rules =
@@ -399,32 +399,36 @@ and unreachable_gen con t_opt size = match t_opt with
 (*** Block ***)
 (** block_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and block_gen (con: context_) t_opt size = 
-  let block_instr t = Gen.(
-    instrs_rule (addLabel (None, t) con) [] t size >>= 
-      fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (t, instrs)), []))
-        | None        -> return (Some (con, Helper.as_phrase (Ast.Block (t, [])), [])) ) in
-  match t_opt with
-  | Some t -> block_instr [t]
-  | None   -> block_instr []
+  let ot =  match t_opt with
+    | Some t -> [t]
+    | None   -> []
+  in
+  Gen.(instrs_rule (addLabel (None, t_opt) con) [] ot size >>= 
+    fun instrs_opt -> match instrs_opt with
+      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (ot, instrs)), []))
+      | None        -> return (Some (con, Helper.as_phrase (Ast.Block (ot, [])), [])) )
 
 (*** Loop ***)
 (** loop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and loop_gen (con: context_) t_opt size = 
-  let loop_instr t = Gen.(
-    instrs_rule (addLabel (None, t) con) [] t size >>= 
-      fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (t, instrs)), []))
-        | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (t, [])), [])) ) in
-  match t_opt with
-  | Some t -> loop_instr [t]
-  | None   -> loop_instr []
+  let ot =  match t_opt with
+    | Some t -> [t]
+    | None   -> []
+  in
+  Gen.(instrs_rule (addLabel (None, t_opt) con) [] ot size >>= 
+    fun instrs_opt -> match instrs_opt with
+      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (ot, instrs)), []))
+      | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (ot, [])), [])) )
 
 (*** If ***)
 (** if_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and if_gen (con: context_) t_opt size = 
-  let if_gen' t = Gen.(
-    pair (instrs_rule (addLabel ((Some Types.I32Type), t) con) [] t (size/2)) (instrs_rule (addLabel ((Some Types.I32Type), t) con) [] t (size/2)) >>= 
+  let ot =  match t_opt with
+    | Some t -> [t]
+    | None   -> []
+  in
+  Gen.( pair (instrs_rule (addLabel ((Some Types.I32Type), t_opt) con) [] ot (size/2)) 
+             (instrs_rule (addLabel ((Some Types.I32Type), t_opt) con) [] ot (size/2)) >>= 
       fun (instrs_opt1, instrs_opt2) -> 
         let instrs1 = match instrs_opt1 with
           | Some instrs -> instrs
@@ -432,32 +436,43 @@ and if_gen (con: context_) t_opt size =
         and instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some (con, Helper.as_phrase (Ast.If (t, instrs1, instrs2)), [Types.I32Type])) ) in
-  match t_opt with
-    | Some t -> if_gen' [t]
-    | None   -> if_gen' []
+        return (Some (con, Helper.as_phrase (Ast.If (ot, instrs1, instrs2)), [Types.I32Type])) )
 
 (*** Br ***)
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and br_gen (con: context_) t_opt size = 
   match Helper.get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.Br (Helper.as_phrase (Int32.of_int i))), tlist)) )
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,it_opt) -> 
+      let it = match it_opt with
+        | Some t -> [t]
+        | None   -> []
+      in
+      return (Some (con, Helper.as_phrase (Ast.Br (Helper.as_phrase (Int32.of_int i))), it)) )
     | []    -> Gen.return None
 
 (*** BrIf ***)
 (** brif_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brif_gen (con: context_) t_opt size = 
   match Helper.get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::tlist)) )
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,it_opt) -> 
+      let it = match it_opt with
+        | Some t -> [t]
+        | None   -> []
+      in
+      return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::it)) )
     | []    -> Gen.return None
 
 (*** BrTable ***)
 (** brtable_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brtable_gen (con: context_) t_opt size = 
   match Helper.get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> 
-      list (oneofl (e::es) >>= fun (i',tlist') -> return (Helper.as_phrase (Int32.of_int i'))) >>= fun ilist ->
-        return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::tlist)) )
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i,it_opt) -> 
+      let it = match it_opt with
+        | Some t -> [t]
+        | None   -> []
+      in    
+      list (oneofl (e::es) >>= fun (i',it_opt') -> return (Helper.as_phrase (Int32.of_int i'))) >>= fun ilist ->
+        return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::it)) )
     | []    -> Gen.return None
 
 (*** Return ***) (* TODO: get function return type *)

@@ -2,8 +2,9 @@ open Wasm
 open QCheck
 
 type context_ = {
-          (* (result, inputs) list *)
-  labels: (Types.value_type option * Types.stack_type) list;
+          (* (input, result) list *)
+  (*labels: (Types.value_type option * Types.stack_type) list;*)
+  labels: (Types.value_type option * Types.value_type option) list;
   funcs: (Types.value_type option * Types.stack_type) list;
   tables: (Types.value_type option * Types.stack_type) list;
   locals: Types.stack_type;
@@ -57,6 +58,6 @@ let get_indexes a l =
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
 let get_indexes_and_inputs a l =
   let rec get_index a' l' i = match List.nth_opt l' i with
-    | Some (e, t)  -> if a' = e then (i,t)::(get_index a' l' (i+1)) else get_index a' l' (i+1)
+    | Some (e, t)  -> if a' = t then (i,t)::(get_index a' l' (i+1)) else get_index a' l' (i+1)
     | None       -> [] in
   get_index a l 0

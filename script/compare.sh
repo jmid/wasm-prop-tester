@@ -56,7 +56,8 @@ V8_SM=$?
 cmp -s $TMP_SM $TMP_JSC
 SM_JSC=$?
 
-if [ "$REF_CH" != 1 ] && [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] && [ "$V8_SM" = "$SM_JSC" ]
+#if [ "$REF_CH" != 1 ] && [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] && [ "$V8_SM" = "$SM_JSC" ]
+if [ "$REF_CH" = "$CH_V8" ] && [ "$CH_V8" = "$V8_SM" ] && [ "$V8_SM" = "$SM_JSC" ]
 then
     # rm $TMP_DIR/tmp_*
     # rmdir "$TMP_DIR"
