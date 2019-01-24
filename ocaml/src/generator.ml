@@ -159,7 +159,7 @@ let func_type_list_gen = Gen.(list func_type_gen)
 let context_gen = 
   Gen.(func_type_list_gen >>= fun funcs ->
     return {
-      labels = [];
+      labels = [None, [Types.I32Type]];
       locals = [];
       globals = [];
       funcs = funcs;
@@ -176,7 +176,7 @@ let module_gen = Gen.(context_gen >>= fun con ->
 let arb_module = make ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)] module_gen
 
 let arithmetic_spec_ast =
-  Test.make ~name:"Arithmetic expressions" ~count:10 
+  Test.make ~name:"Arithmetic expressions" ~count:5 
   arb_module
   (function
     | None    -> true
@@ -191,7 +191,7 @@ let arithmetic_spec_ast =
 ;;
 
 let module_test =
-  Test.make ~name:"Arithmetic expressions" ~count:10 
+  Test.make ~name:"Arithmetic expressions" ~count:1 
   (Instr_gen.arb_intsr context)
   (function
     | None    -> true

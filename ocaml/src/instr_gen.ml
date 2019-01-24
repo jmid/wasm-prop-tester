@@ -36,14 +36,12 @@ and instr' =
   | SetGlobal of var                  (* write global variable *)
   
 
-  | Unreachable                       (* trap unconditionally *)
-  | Return                            (* break from function body *)
-
-
   | Call of var                       (* call function *)
   | CallIndirect of var               (* call function through table *)
 
 
+  | Unreachable                       (* trap unconditionally *)
+  | Return                            (* break from function body *)
   | Nop                               (* do nothing *)
   | Drop                              (* forget a value *)
   | Select                            (* branchless conditional *)
@@ -98,9 +96,10 @@ and instr_rule con t_opt size = match t_opt with
       | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
                            (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); 
                            (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
-                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
+                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (*(11, getLocal_gen con t_opt size);
                            (11, setLocal_gen con t_opt size); (11, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
-                           (11, setGlobal_gen con t_opt size);] in
+                           (11, setGlobal_gen con t_opt size); (11, unreachable_gen con t_opt size); (11, return_gen con t_opt size);*)
+                           (11, br_gen con t_opt size);] in
                   listPermuteTermGenInner con t_opt size rules)
 
 and listPermuteTermGenInner con goal size rules =
@@ -401,10 +400,10 @@ and unreachable_gen con t_opt size = match t_opt with
 (** block_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and block_gen (con: context_) t_opt size = 
   let block_instr t = Gen.(
-    instrs_rule con [] t size >>= 
+    instrs_rule (addLabel (None, t) con) [] t size >>= 
       fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Block (t, instrs)), []))
-        | None        -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Block (t, [])), [])) ) in
+        | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (t, instrs)), []))
+        | None        -> return (Some (con, Helper.as_phrase (Ast.Block (t, [])), [])) ) in
   match t_opt with
   | Some t -> block_instr [t]
   | None   -> block_instr []
@@ -413,10 +412,10 @@ and block_gen (con: context_) t_opt size =
 (** loop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and loop_gen (con: context_) t_opt size = 
   let loop_instr t = Gen.(
-    instrs_rule con [] t size >>= 
+    instrs_rule (addLabel (None, t) con) [] t size >>= 
       fun instrs_opt -> match instrs_opt with
-        | Some instrs -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Loop (t, instrs)), []))
-        | None        -> return (Some ((addLabel (None, t) con), Helper.as_phrase (Ast.Loop (t, [])), [])) ) in
+        | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (t, instrs)), []))
+        | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (t, [])), [])) ) in
   match t_opt with
   | Some t -> loop_instr [t]
   | None   -> loop_instr []
@@ -425,7 +424,7 @@ and loop_gen (con: context_) t_opt size =
 (** if_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and if_gen (con: context_) t_opt size = 
   let if_gen' t = Gen.(
-    pair (instrs_rule con [] t (size/2)) (instrs_rule con [] t (size/2)) >>= 
+    pair (instrs_rule (addLabel ((Some Types.I32Type), t) con) [] t (size/2)) (instrs_rule (addLabel ((Some Types.I32Type), t) con) [] t (size/2)) >>= 
       fun (instrs_opt1, instrs_opt2) -> 
         let instrs1 = match instrs_opt1 with
           | Some instrs -> instrs
@@ -433,7 +432,7 @@ and if_gen (con: context_) t_opt size =
         and instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some ((addLabel ((Some Types.I32Type), t) con), Helper.as_phrase (Ast.If (t, instrs1, instrs2)), [Types.I32Type])) ) in
+        return (Some (con, Helper.as_phrase (Ast.If (t, instrs1, instrs2)), [Types.I32Type])) ) in
   match t_opt with
     | Some t -> if_gen' [t]
     | None   -> if_gen' []
@@ -461,11 +460,9 @@ and brtable_gen (con: context_) t_opt size =
         return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::tlist)) )
     | []    -> Gen.return None
 
-(*** Return ***)
+(*** Return ***) (* TODO: get function return type *)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and return_gen (con: context_) t_opt size = match con.return with
-  | Some t -> Gen.return (Some (con, Helper.as_phrase (Ast.Return, [t])))
-  | None   -> Gen.return (Some (con, Helper.as_phrase (Ast.Return, [])))
+and return_gen (con: context_) t_opt size = Gen.return (Some (con, Helper.as_phrase Ast.Return, [Types.I32Type]))
 
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
