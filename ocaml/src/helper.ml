@@ -55,9 +55,21 @@ let get_indexes a l =
     | None    -> [] in
   get_index a l 0
 
+(** get_random_element: 'a -> ('a * 'b) list -> 'b **)
+let get_random_element a l =
+  let rec get_index a' l' i = match List.nth_opt l' i with
+    | Some (e, t)  -> if a' = t then e::(get_index a' l' (i+1)) else get_index a' l' (i+1)
+    | None       -> [] in
+  let type_list = get_index a l 0 in
+  match List.length type_list with
+    | 0 -> None
+    | n -> Some (List.nth type_list (Random.int n))
+
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
 let get_indexes_and_inputs a l =
-  let rec get_index a' l' i = match List.nth_opt l' i with
-    | Some (e, t)  -> if a' = t then (i,t)::(get_index a' l' (i+1)) else get_index a' l' (i+1)
+  let rec get_index_ot a' b' l' i = match List.nth_opt l' i with
+    | Some (e, t)  -> if a' = t && b' = e then (i,t)::(get_index_ot a' b' l' (i+1)) else get_index_ot a' b' l' (i+1)
     | None       -> [] in
-  get_index a l 0
+  match get_random_element a l with
+    | Some t -> get_index_ot a t l 0
+    | None   -> []

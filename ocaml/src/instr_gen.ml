@@ -17,8 +17,6 @@ let addLabel t_option con =
 (*
 type instr = instr' Source.phrase
 and instr' =
-  | BrTable of var list * var         (* indexed break *)
-
 
   | Load of loadop                    (* read memory at address *)
   | Store of storeop                  (* write memory at address *)
@@ -26,10 +24,6 @@ and instr' =
 
   | MemorySize                        (* size of linear memory *)
   | MemoryGrow                        (* grow linear memory *)
-
-
-  | Br of var                         (* break to n-th surrounding label *)
-  | BrIf of var                       (* conditional break *)
 
 
   | GetGlobal of var                  (* read global variable *)
@@ -57,6 +51,9 @@ and instr' =
   | GetLocal of var                   (* read local variable *)
   | SetLocal of var                   (* write local variable *)
   | TeeLocal of var                   (* write local variable and keep value *)
+  | Br of var                         (* break to n-th surrounding label *)
+  | BrIf of var                       (* conditional break *)
+  | BrTable of var list * var         (* indexed break *)
 *)
 
 (*** Instructions list generator ***)
@@ -403,7 +400,7 @@ and block_gen (con: context_) t_opt size =
     | Some t -> [t]
     | None   -> []
   in
-  Gen.(instrs_rule (addLabel (None, t_opt) con) [] ot size >>= 
+  Gen.(instrs_rule (addLabel (t_opt, t_opt) con) [] ot size >>= 
     fun instrs_opt -> match instrs_opt with
       | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (ot, instrs)), []))
       | None        -> return (Some (con, Helper.as_phrase (Ast.Block (ot, [])), [])) )
