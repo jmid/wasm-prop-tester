@@ -67,22 +67,22 @@ let rec instrs_rule context input_ts output_ts size =
               | Some instrs ->
                 return (Some (instrs@[instr'])) ) ) in
     match output_ts with
-      []          -> 
-        let empty_gen = recgen context None [] in
-          if input_ts = output_ts 
-          then Gen.(oneof [ empty_gen; return (Some []) ])
-          else empty_gen
-      | t1::trst  ->
-        let empty_gen = recgen context None output_ts
-        and non_empty_gen = recgen context (Some t1) trst in
-          if input_ts = output_ts 
-          then Gen.(frequency [ 1, empty_gen; 8, non_empty_gen; 1, return (Some []) ])
-          else Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])
+          []          -> 
+            let empty_gen = recgen context None [] in
+              if input_ts = output_ts 
+              then Gen.(oneof [ empty_gen; return (Some []) ])
+              else empty_gen
+          | t1::trst  ->
+            let empty_gen = recgen context None output_ts
+            and non_empty_gen = recgen context (Some t1) trst in
+              if input_ts = output_ts 
+              then Gen.(frequency [ 1, empty_gen; 1, non_empty_gen; 1, return (Some []) ])
+              else Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])
 
 (** instr_rule : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
 and instr_rule con t_opt size = match t_opt with
     | None   -> (match size with
-      | 0 -> let rules = [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size)] in
+      | 0 -> let rules = [(1, nop_gen con t_opt size); (*1, drop_gen con t_opt size*)] in
                   listPermuteTermGenInner con t_opt size rules
       | n -> let rules = [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
                           (1, loop_gen con t_opt size)] in
@@ -90,13 +90,14 @@ and instr_rule con t_opt size = match t_opt with
     | Some _ -> (match size with 
       | 0 -> let rules = [(1, const_gen con t_opt size)]; in
                   listPermuteTermGenInner con t_opt size rules
-      | n -> let rules = [ (1, const_gen con t_opt size); (*(9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
-                           (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);*) (9, cvtop_gen con t_opt size); 
+      | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
+                           (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);(**) (9, cvtop_gen con t_opt size); 
                            (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
-                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (*(11, getLocal_gen con t_opt size);
+                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
                            (11, setLocal_gen con t_opt size); (11, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
-                           (11, setGlobal_gen con t_opt size); (11, unreachable_gen con t_opt size); (11, return_gen con t_opt size);*)
-                           (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);(**)] in
+                           (11, setGlobal_gen con t_opt size); (11, unreachable_gen con t_opt size); (11, return_gen con t_opt size);(**)
+                           (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);
+                           (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)] in
                   listPermuteTermGenInner con t_opt size rules)
 
 and listPermuteTermGenInner con goal size rules =
@@ -474,22 +475,32 @@ and brtable_gen (con: context_) t_opt size =
 
 (*** Return ***) (* TODO: get function return type *)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and return_gen (con: context_) t_opt size = Gen.return (Some (con, Helper.as_phrase Ast.Return, [Types.I32Type]))
+and return_gen (con: context_) t_opt size = 
+  let tlist = match con.return with
+    | Some t -> [t]
+    | None   -> []
+  in
+  Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))
 
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and call_gen (con: context_) t_opt size = 
   match Helper.get_indexes_and_inputs t_opt con.funcs with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), tlist)) )
+    | e::es -> Gen.( oneofl (e::es) >>= fun (i, t_opt) -> 
+                let tlist = match t_opt with
+                  | Some t -> [t]
+                  | None   -> [] in
+                return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), tlist)) )
     | []    -> Gen.return None
 
 (*** CallIndirect ***)
 (** callindirect_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+(* 
 and callindirect_gen (con: context_) t_opt size = 
-  match Helper.get_indexes_and_inputs t_opt con.tables with
+  match Helper.get_indexes_and_inputs2 t_opt con.tables with
     | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.CallIndirect (Helper.as_phrase (Int32.of_int i))), tlist)) )
     | []    -> Gen.return None
-
+*)
 
 
 
@@ -522,10 +533,18 @@ let rec drop_stat list_opt = match list_opt with
           | Ast.Drop      -> 1 + (nop_stat (Some (es)))
           | _             -> 0 + (nop_stat (Some (es)))
 
+
+let instr_gen context types = 
+  Gen.(sized (fun n -> 
+    (*print_endline (string_of_int (List.length (fst types)));*)
+    instrs_rule context (fst types) (snd types) n >>= fun instrs -> return instrs))
+    (*instrs_rule context [Types.I32Type] [Types.I32Type] n >>= fun instrs -> return instrs))*)
+
+(*
 let instr_gen context = Gen.sized (fun n -> instrs_rule context [] [Types.I32Type] n)
 
 let arb_intsr context = make ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)] (instr_gen context)
-
+*)
 
 
 (* 

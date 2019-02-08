@@ -5,7 +5,7 @@ type context_ = {
           (* (input, result) list *)
   (*labels: (Types.value_type option * Types.stack_type) list;*)
   labels: (Types.value_type option * Types.value_type option) list;
-  funcs: (Types.value_type option * Types.stack_type) list;
+  funcs: (Types.stack_type * Types.value_type option) list;
   tables: (Types.value_type option * Types.stack_type) list;
   locals: Types.stack_type;
   globals: Types.stack_type;
@@ -42,6 +42,7 @@ let get_module types funcs = {
 ;;
 
 let types_ = [ 
+  as_phrase (Types.FuncType ([], []));
   as_phrase (Types.FuncType ([], [Types.I32Type]));
   as_phrase (Types.FuncType ([], [Types.I64Type]));
   as_phrase (Types.FuncType ([], [Types.F32Type]));
@@ -73,3 +74,15 @@ let get_indexes_and_inputs a l =
   match get_random_element a l with
     | Some t -> get_index_ot a t l 0
     | None   -> []
+
+(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
+let get_indexes_and_inputs2 a l =
+  let ot = match a with
+    | Some e -> [e]
+    | None   -> [] in 
+    let rec get_index_ot a' b' l' i = match List.nth_opt l' i with
+      | Some (e, t)  -> if a' = t && b' = e then (i,t)::(get_index_ot a' b' l' (i+1)) else get_index_ot a' b' l' (i+1)
+      | None       -> [] in
+    match get_random_element a l with
+      | Some t -> get_index_ot a t l 0
+      | None   -> []
