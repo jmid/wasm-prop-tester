@@ -149,38 +149,19 @@ let stack_type_gen n = Gen.(list_repeat n (oneofl [Types.I32Type; Types.I64Type;
 ;;
 
 (** func_type_gen : func_type **)
-let func_type_gen = Gen.(pair small_int (int_bound 1)>>= fun (n, m) -> 
-  pair (stack_type_gen n) (stack_type_gen m) >>= fun t -> return t)
-;;
-
-(** func_type_gen : func_type **)
-let func_type_gen2 = Gen.(pair small_int (int_bound 1)>>= fun (n, m) -> 
+let func_type_gen = Gen.(small_int >>= fun n -> 
   pair (stack_type_gen n) (value_type_opt_gen) >>= fun t -> return t)
 ;;
 
 (** func_type_list_gen : func_type list **)
-let func_type_list_gen = Gen.(list_size small_nat func_type_gen2)
+let func_type_list_gen = Gen.(list_size small_nat func_type_gen)
 ;;
 
 (** func_type_list_gen : func_type list **)
-let func_type_list_gen2 = Gen.(list_size (int_bound 2) func_type_gen2)
+let func_type_list_gen2 = Gen.(list_size (int_bound 2) func_type_gen)
 ;;
 
 let context_gen = 
-  Gen.(func_type_list_gen >>= fun funcs ->
-    return {
-      labels = [Some (Types.I32Type), Some (Types.I32Type)];
-      locals = [];
-      globals = [];
-      funcs = ([Types.I32Type; Types.F32Type], (Some Types.I32Type))::funcs;
-      mems = [];
-      return = None;
-      tables = [];
-      funcindex = 0;
-    }
-  )
-
-let context2_gen = 
   Gen.(func_type_list_gen2 >>= fun funcs ->
     return {
       labels = [];
@@ -218,28 +199,7 @@ let context_with_ftype con funcindex =
       } in
       con'
 
-(* 
-let module_gen = Gen.(context2_gen >>= fun con -> 
-  (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
-  let rec rec_func_gen func_types index = match func_types with
-    | e::rst -> let func_t = match snd e with
-                  | Some t -> [t]
-                  | None   -> []
-                in
-                (let instrs_opt = generate1 (Instr_gen.instr_gen (context_with_ftype con (snd e)) (fst e, func_t)) in
-                  (let instrs = match instrs_opt with
-                    | Some inst -> inst
-                    | None      -> [] 
-                  in
-                  as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) instrs))
-                )::(rec_func_gen rst (index + 1) ) 
-    | []     -> [] in
-    let funcs = rec_func_gen con.funcs 0 in
-      return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) funcs))
-  )
-*)
-
-let module_gen = Gen.(context2_gen >>= fun con -> 
+let module_gen = Gen.(context_gen >>= fun con -> 
   (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
   let rec rec_func_gen func_types index = match func_types with
     | e::rst -> let func_t = match snd e with
@@ -261,10 +221,9 @@ let module_gen = Gen.(context2_gen >>= fun con ->
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1000 
+  Test.make ~name:"Modules" ~count:10 
   arb_module
   (function m ->
-    (*print_endline "start";*)
     let arrange_m = Arrange.module_ m in
       wasm_to_file arrange_m
     ;
