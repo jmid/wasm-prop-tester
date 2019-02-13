@@ -132,6 +132,7 @@ let context = {
   mems = [];
   return = None;
   tables = [];
+  funcindex = 0;
 }
 ;;
 
@@ -154,11 +155,15 @@ let func_type_gen = Gen.(pair small_int (int_bound 1)>>= fun (n, m) ->
 
 (** func_type_gen : func_type **)
 let func_type_gen2 = Gen.(pair small_int (int_bound 1)>>= fun (n, m) -> 
-  pair (return []) (value_type_opt_gen) >>= fun t -> return t)
+  pair (stack_type_gen n) (value_type_opt_gen) >>= fun t -> return t)
 ;;
 
 (** func_type_list_gen : func_type list **)
 let func_type_list_gen = Gen.(list_size small_nat func_type_gen2)
+;;
+
+(** func_type_list_gen : func_type list **)
+let func_type_list_gen2 = Gen.(list_size (int_bound 2) func_type_gen2)
 ;;
 
 let context_gen = 
@@ -171,19 +176,21 @@ let context_gen =
       mems = [];
       return = None;
       tables = [];
+      funcindex = 0;
     }
   )
 
 let context2_gen = 
-  Gen.(func_type_list_gen >>= fun funcs ->
+  Gen.(func_type_list_gen2 >>= fun funcs ->
     return {
-      labels = [Some (Types.I32Type), Some (Types.I32Type)];
+      labels = [];
       locals = [];
       globals = [];
       funcs = ([], Some (Types.I32Type))::funcs;
       mems = [];
       return = None;
       tables = [];
+      funcindex = 0;
     }
   )
 
@@ -194,18 +201,24 @@ let rec func_type_list_to_type_phrase func_type_list = match func_type_list with
       (as_phrase (Types.FuncType (fst e, ot_opt)))::(func_type_list_to_type_phrase rst)
   | []     -> []
 
-let context_with_ftype con ftype = 
-  let con' = {
-    labels = con.labels;
-    locals = con.locals;
-    globals = con.globals;
-    funcs = con.funcs;
-    mems = con.mems;
-    return = ftype;
-    tables = con.tables;
-  } in
-  con'
+let context_with_ftype con funcindex = 
+  let ftype = List.nth con.funcs funcindex
+  in
+    let label = [snd ftype, snd ftype]
+    in
+      let con' = {
+        labels = label;
+        locals = con.locals;
+        globals = con.globals;
+        funcs = con.funcs;
+        mems = con.mems;
+        return = None;
+        tables = con.tables;
+        funcindex = funcindex;
+      } in
+      con'
 
+(* 
 let module_gen = Gen.(context2_gen >>= fun con -> 
   (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
   let rec rec_func_gen func_types index = match func_types with
@@ -224,11 +237,31 @@ let module_gen = Gen.(context2_gen >>= fun con ->
     let funcs = rec_func_gen con.funcs 0 in
       return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) funcs))
   )
+*)
+
+let module_gen = Gen.(context2_gen >>= fun con -> 
+  (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
+  let rec rec_func_gen func_types index = match func_types with
+    | e::rst -> let func_t = match snd e with
+                  | Some t -> [t]
+                  | None   -> []
+                in
+                (let instrs_opt = generate1 (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t)) in
+                  (let instrs = match instrs_opt with
+                    | Some inst -> inst
+                    | None      -> [] 
+                  in
+                  as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) instrs))
+                )::(rec_func_gen rst (index + 1) ) 
+    | []     -> [] in
+    let funcs = rec_func_gen con.funcs 0 in
+      return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) funcs))
+  )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1 
+  Test.make ~name:"Modules" ~count:1000 
   arb_module
   (function m ->
     (*print_endline "start";*)
@@ -260,6 +293,7 @@ let arithmetic_spec_ast =
 ;;
 
 QCheck_runner.set_seed(410086340);;
+22165827
 (*QCheck_runner.set_seed(401353417);;*)
 QCheck_runner.run_tests ~verbose:true [ (*arithmetic_spec_ast;*) (*module_test;*)module_test; ] ;;
 *)

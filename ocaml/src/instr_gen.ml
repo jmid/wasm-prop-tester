@@ -11,6 +11,7 @@ let addLabel t_option con =
     mems = con.mems;
     return = con.return;
     tables = con.tables;
+    funcindex = con.funcindex;
   } in
   con'
 
@@ -69,15 +70,17 @@ let rec instrs_rule context input_ts output_ts size =
     match output_ts with
           []          -> 
             let empty_gen = recgen context None [] in
-              if input_ts = output_ts 
+              Gen.(oneof [ empty_gen; return (Some []) ])
+              (*if input_ts = output_ts 
               then Gen.(oneof [ empty_gen; return (Some []) ])
-              else empty_gen
+              else empty_gen*)
           | t1::trst  ->
             let empty_gen = recgen context None output_ts
             and non_empty_gen = recgen context (Some t1) trst in
-              if input_ts = output_ts 
+              Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])
+              (*if input_ts = output_ts 
               then Gen.(frequency [ 1, empty_gen; 1, non_empty_gen; 1, return (Some []) ])
-              else Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])
+              else Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])*)
 
 (** instr_rule : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
 and instr_rule con t_opt size = match t_opt with
@@ -476,8 +479,10 @@ and brtable_gen (con: context_) t_opt size =
 (*** Return ***) (* TODO: get function return type *)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and return_gen (con: context_) t_opt size = 
-  let tlist = match con.return with
-    | Some t -> [t]
+  let tlist = match List.nth_opt con.funcs con.funcindex with
+    | Some e -> (match snd e with
+      | Some t -> [t]
+      | None   -> [])
     | None   -> []
   in
   Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))
@@ -485,12 +490,10 @@ and return_gen (con: context_) t_opt size =
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and call_gen (con: context_) t_opt size = 
-  match Helper.get_indexes_and_inputs t_opt con.funcs with
+  match Helper.get_indexes_and_inputs2 t_opt con.funcs con.funcindex with
     | e::es -> Gen.( oneofl (e::es) >>= fun (i, t_opt) -> 
-                let tlist = match t_opt with
-                  | Some t -> [t]
-                  | None   -> [] in
-                return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), tlist)) )
+                let tlist = t_opt in
+                return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev tlist))) )
     | []    -> Gen.return None
 
 (*** CallIndirect ***)
