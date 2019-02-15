@@ -52,6 +52,62 @@ let types_ = [
 
 (** get_indexes: a' -> a list -> int list **)
 let get_indexes a l =
+  let rec get_index a' l' i = try match (List.nth l' i) = a' with
+    | true  -> i::(get_index a' l' (i+1)) 
+    | false -> get_index a' l' (i+1) with Failure "nth" -> [] in
+  get_index a l 0
+
+(** get_random_element: 'a -> ('a * 'b) list -> 'b **)
+let get_random_element a l =
+  let rec get_index a' l' i = try
+    let element = List.nth l' i in
+    match snd element = a' with
+      | true  -> (fst element)::(get_index a' l' (i+1))
+      | false -> get_index a' l' (i+1) with Failure "nth" -> [] in
+  let type_list = get_index a l 0 in
+  match List.length type_list with
+    | 0 -> None
+    | n -> Some (List.nth type_list (Random.int n))
+
+(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
+let get_indexes_and_inputs a l =
+  let rec get_index_ot a' b' l' i = try
+    let element = List.nth l' i in
+    match snd element = a' && fst element = b' with
+      | true  -> (i,(snd element))::(get_index_ot a' b' l' (i+1))
+      | false -> get_index_ot a' b' l' (i+1) with Failure "nth" -> [] in
+  match get_random_element a l with
+    | Some t -> get_index_ot a t l 0
+    | None   -> []
+
+
+(** get_random_element: 'a -> ('a * 'b) list -> 'b **)
+let get_random_element2 a l index =
+  let rec get_index a' l' i = match i = index with
+    | true  -> get_index a' l' (i+1)
+    | false -> try
+      let element = List.nth l' i in
+      match snd element = a' with
+        | true  -> (fst element)::(get_index a' l' (i+1))
+        | false -> get_index a' l' (i+1) with Failure "nth" -> [] in
+  let type_list = get_index a l 0 in
+  match List.length type_list with
+    | 0 -> None
+    | n -> Some (List.nth type_list (Random.int n))
+
+(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
+let get_indexes_and_inputs2 a l index =
+  let rec get_index_ot a' b' l' i =  try
+    let element = List.nth l' i in
+    match snd element = a' && fst element = b' with
+      | true  -> (i,(fst element))::(get_index_ot a' b' l' (i+1))
+      | false -> get_index_ot a' b' l' (i+1) with Failure "nth" -> [] in
+  match get_random_element2 a l index with
+    | Some t -> get_index_ot a t l 0
+    | None   -> []
+
+(*(** get_indexes: a' -> a list -> int list **)
+let get_indexes a l =
   let rec get_index a' l' i = match List.nth_opt l' i with
     | Some e  -> if a' = e then i::(get_index a' l' (i+1)) else get_index a' l' (i+1)
     | None    -> [] in
@@ -96,7 +152,7 @@ let get_indexes_and_inputs2 a l index =
     | None       -> [] in
   match get_random_element2 a l index with
     | Some t -> get_index_ot a t l 0
-    | None   -> []
+    | None   -> []*)
 
 
 (* 

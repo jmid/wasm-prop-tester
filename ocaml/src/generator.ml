@@ -221,7 +221,7 @@ let module_gen = Gen.(context_gen >>= fun con ->
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:10 
+  Test.make ~name:"Modules" ~count:100 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
@@ -231,6 +231,7 @@ let module_test =
   )
 ;;
 
+QCheck_runner.set_seed(294956219);;
 QCheck_runner.run_tests ~verbose:true [ module_test; ] ;;
 
 (*
@@ -250,7 +251,7 @@ let arithmetic_spec_ast =
       Sys.command ("../script/compare.sh " ^ file_name) = 0
   )
 ;;
-
+294956219
 QCheck_runner.set_seed(410086340);;
 22165827
 (*QCheck_runner.set_seed(401353417);;*)

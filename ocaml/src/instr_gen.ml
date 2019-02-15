@@ -86,13 +86,13 @@ let rec instrs_rule context input_ts output_ts size =
 and instr_rule con t_opt size = match t_opt with
     | None   -> (match size with
       | 0 -> let rules = [(1, nop_gen con t_opt size); (*1, drop_gen con t_opt size*)] in
-                  listPermuteTermGenInner con t_opt size rules
+                  listPermuteTermGenOuter con t_opt size rules
       | n -> let rules = [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
                           (1, loop_gen con t_opt size)] in
-                  listPermuteTermGenInner con t_opt size rules)
+                  listPermuteTermGenOuter con t_opt size rules)
     | Some _ -> (match size with 
       | 0 -> let rules = [(1, const_gen con t_opt size)]; in
-                  listPermuteTermGenInner con t_opt size rules
+                  listPermuteTermGenOuter con t_opt size rules
       | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
                            (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);(**) (9, cvtop_gen con t_opt size); 
                            (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
@@ -101,9 +101,57 @@ and instr_rule con t_opt size = match t_opt with
                            (11, setGlobal_gen con t_opt size); (11, unreachable_gen con t_opt size); (11, return_gen con t_opt size);(**)
                            (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);
                            (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)] in
-                  listPermuteTermGenInner con t_opt size rules)
+                  listPermuteTermGenOuter con t_opt size rules)
 
-and listPermuteTermGenInner con goal size rules =
+and listPermuteTermGenOuter con goal size rules =
+  let indexed_rules = 
+    let _,ig = List.fold_left 
+      (fun (i,acc) (w,g) -> (i+1, (w, (i, g))::acc)) (0,[]) rules in
+    ig in
+  let rec listPermuteTermGenInner con goal size irules = 
+    let rec removeAt n xs = match xs with
+      | e::rst -> (match fst e = n with
+        | true  -> removeAt n rst
+        | false -> e::(removeAt n rst))
+      | []  -> [] in
+    let toTerm i g = Gen.(g >>= fun t -> match t with
+      | Some term -> return (Some term)
+      | None      ->
+        let remainingRules = removeAt i irules in
+        listPermuteTermGenInner con goal size remainingRules) in
+
+    if irules = []
+    then Gen.return None
+    else Gen.(frequencyl irules >>= (fun (i, g) -> toTerm i g))
+  in
+  listPermuteTermGenInner con goal size indexed_rules
+
+  (*let remove t xs = List.filter (fun a -> snd a != t) xs in)
+  let toTerm instrs_opt = 
+    (*Gen.(inst con  >>= fun instrs_opt -> *)match instrs_opt with
+      | Some instrs -> Gen.return (Some instrs)
+      | None        -> Gen.return None
+        (*let remainingRules = remove instrs_opt rules in
+        listPermuteTermGenInner con goal size remainingRules in*)
+        in
+  *)
+  (*let rec removeAt n xs = match (n, xs) with
+    | (0, x::xs) -> xs
+    | (n, x::xs) -> x :: removeAt (n - 1) xs
+    | _          -> failwith "index out of bounds" in
+  let elementsWeighted xs =
+    Gen.(List.map 
+      (fun) )
+    Gen.(int_bound (List.length xs) >>= fun i -> return (i, List.nth xs i)) in
+  let toTerm i = function
+      | Some term -> Gen.return (Some term)
+      | None      ->
+        let remainingRules = removeAt i rules in
+        listPermuteTermGenInner con goal size remainingRules in*)
+
+  
+
+(*and listPermuteTermGenInner con goal size rules =
   let rec removeAt n xs = match (n, xs) with
     | (0, x::xs) -> xs
     | (n, x::xs) -> x :: removeAt (n - 1) xs
@@ -120,7 +168,7 @@ and listPermuteTermGenInner con goal size rules =
 
   if rules = []
   then Gen.return None
-  else Gen.(elementsWeighted rules >>= (fun (i,t) -> toTerm i t))
+  else Gen.(elementsWeighted rules >>= (fun (i,t) -> toTerm i t))*)
 
 (**** Numeric Instructions ****)
 
@@ -476,7 +524,17 @@ and brtable_gen (con: context_) t_opt size =
         return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::it)) )
     | []    -> Gen.return None
 
-(*** Return ***) (* TODO: get function return type *)
+
+(*** Return ***) 
+(** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and return_gen (con: context_) t_opt size = 
+  let tlist = match snd (List.nth con.funcs con.funcindex) with
+    | Some t -> [t]
+    | None   -> []
+  in
+  Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))
+
+(*(*** Return ***) (* TODO: get function return type *)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and return_gen (con: context_) t_opt size = 
   let tlist = match List.nth_opt con.funcs con.funcindex with
@@ -485,7 +543,7 @@ and return_gen (con: context_) t_opt size =
       | None   -> [])
     | None   -> []
   in
-  Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))
+  Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))*)
 
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
