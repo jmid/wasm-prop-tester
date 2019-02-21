@@ -95,10 +95,10 @@ and instr_rule con t_opt size = match t_opt with
                   listPermuteTermGenOuter con t_opt size rules
       | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
                            (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);(**) (9, cvtop_gen con t_opt size); 
-                           (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
-                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
-                           (11, setLocal_gen con t_opt size); (11, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
-                           (11, setGlobal_gen con t_opt size); (11, unreachable_gen con t_opt size); (11, return_gen con t_opt size);(**)
+                           (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
+                           (11, if_gen con t_opt size); (5, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
+                           (5, setLocal_gen con t_opt size); (5, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
+                           (1, setGlobal_gen con t_opt size); (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size);(**)
                            (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);
                            (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)] in
                   listPermuteTermGenOuter con t_opt size rules)
@@ -111,12 +111,12 @@ and listPermuteTermGenOuter con goal size rules =
   let rec listPermuteTermGenInner con goal size irules = 
     let rec removeAt n xs = match xs with
       | e::rst -> (match fst e = n with
-        | true  -> removeAt n rst
+        | true  -> rst
         | false -> e::(removeAt n rst))
       | []  -> [] in
     let toTerm i g = Gen.(g >>= fun t -> match t with
-      | Some term -> return (Some term)
-      | None      ->
+      | Some _ -> return t
+      | None   ->
         let remainingRules = removeAt i irules in
         listPermuteTermGenInner con goal size remainingRules) in
 
@@ -124,32 +124,7 @@ and listPermuteTermGenOuter con goal size rules =
     then Gen.return None
     else Gen.(frequencyl irules >>= (fun (i, g) -> toTerm i g))
   in
-  listPermuteTermGenInner con goal size indexed_rules
-
-  (*let remove t xs = List.filter (fun a -> snd a != t) xs in)
-  let toTerm instrs_opt = 
-    (*Gen.(inst con  >>= fun instrs_opt -> *)match instrs_opt with
-      | Some instrs -> Gen.return (Some instrs)
-      | None        -> Gen.return None
-        (*let remainingRules = remove instrs_opt rules in
-        listPermuteTermGenInner con goal size remainingRules in*)
-        in
-  *)
-  (*let rec removeAt n xs = match (n, xs) with
-    | (0, x::xs) -> xs
-    | (n, x::xs) -> x :: removeAt (n - 1) xs
-    | _          -> failwith "index out of bounds" in
-  let elementsWeighted xs =
-    Gen.(List.map 
-      (fun) )
-    Gen.(int_bound (List.length xs) >>= fun i -> return (i, List.nth xs i)) in
-  let toTerm i = function
-      | Some term -> Gen.return (Some term)
-      | None      ->
-        let remainingRules = removeAt i rules in
-        listPermuteTermGenInner con goal size remainingRules in*)
-
-  
+  listPermuteTermGenInner con goal size indexed_rules  
 
 (*and listPermuteTermGenInner con goal size rules =
   let rec removeAt n xs = match (n, xs) with
@@ -324,9 +299,10 @@ and select_gen con t_opt size = match t_opt with
 (*** GetLocal ***)
 (** getLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and getLocal_gen (con: context_) t_opt size = match t_opt with
-  | Some t -> (match Helper.get_indexes t con.locals with
-    | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [])) )
-    | []    -> Gen.return None )
+  | Some t -> (let locals = Helper.get_indexes t con.locals in
+      match locals with
+        | e::es -> Gen.( oneofl locals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetLocal (Helper.as_phrase (Int32.of_int i))), [])) )
+        | []    -> Gen.return None )
   | None -> Gen.return None
 
 (*** SetLocal ***)
@@ -334,24 +310,27 @@ and getLocal_gen (con: context_) t_opt size = match t_opt with
 and setLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> Gen.( oneofl con.locals >>= 
-    fun t -> (match Helper.get_indexes t con.locals with
-                | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
-                | []    -> Gen.return None ))
+    fun t -> (let locals = Helper.get_indexes t con.locals in
+                match locals with
+                  | e::es -> Gen.( oneofl locals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
+                  | []    -> Gen.return None ))
 
 (*** TeeLocal ***)
 (** teeLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and teeLocal_gen (con: context_) t_opt size = match t_opt with
-  | Some t -> (match Helper.get_indexes t con.locals with
-    | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.TeeLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
-    | []    -> Gen.return None )
+  | Some t -> (let locals = Helper.get_indexes t con.locals in
+      match locals with
+        | e::es -> Gen.( oneofl locals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.TeeLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
+        | []    -> Gen.return None )
   | None -> Gen.return None
 
 (*** GetGlobal ***)
 (** getGlobal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and getGlobal_gen (con: context_) t_opt size = match t_opt with
-  | Some t -> (match Helper.get_indexes t con.globals with
-    | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetGlobal (Helper.as_phrase (Int32.of_int i))), [])) )
-    | []    -> Gen.return None )
+  | Some t -> (let globals = Helper.get_indexes t con.globals in
+    match globals with
+      | e::es -> Gen.( oneofl globals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetGlobal (Helper.as_phrase (Int32.of_int i))), [])) )
+      | []    -> Gen.return None )
   | None -> Gen.return None
 
 (*** SetGlobal ***)
@@ -359,12 +338,12 @@ and getGlobal_gen (con: context_) t_opt size = match t_opt with
 and setGlobal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> Gen.( oneofl con.globals >>= 
-    fun t -> (match Helper.get_indexes t con.globals with
-                | e::es -> Gen.( oneofl (e::es) >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetGlobal (Helper.as_phrase (Int32.of_int i))), [t])) )
-                | []    -> Gen.return None ))
+    fun t -> (let globals = Helper.get_indexes t con.globals in
+                match globals with
+                  | e::es -> Gen.( oneofl globals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetGlobal (Helper.as_phrase (Int32.of_int i))), [t])) )
+                  | []    -> Gen.return None ))
 
 (**** Memory Instructions ****)
-
 (** align_load_gen **)
 and align_load_gen t p_opt = 
   let width = match p_opt with
@@ -502,28 +481,29 @@ and br_gen (con: context_) t_opt size =
 (*** BrIf ***)
 (** brif_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brif_gen (con: context_) t_opt size = 
-  match Helper.get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,it_opt) -> 
-      let it = match it_opt with
-        | Some t -> [t]
-        | None   -> []
-      in
-      return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::it)) )
-    | []    -> Gen.return None
+  let labels = Helper.get_indexes_and_inputs t_opt con.labels in
+    match labels with
+      | e::es -> Gen.( oneofl labels >>= fun (i,it_opt) -> 
+        let it = match it_opt with
+          | Some t -> [t]
+          | None   -> []
+        in
+        return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::it)) )
+      | []    -> Gen.return None
 
 (*** BrTable ***)
 (** brtable_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brtable_gen (con: context_) t_opt size = 
-  match Helper.get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,it_opt) -> 
-      let it = match it_opt with
-        | Some t -> [t]
-        | None   -> []
-      in    
-      list (oneofl (e::es) >>= fun (i',it_opt') -> return (Helper.as_phrase (Int32.of_int i'))) >>= fun ilist ->
-        return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::it)) )
-    | []    -> Gen.return None
-
+  let labels = Helper.get_indexes_and_inputs t_opt con.labels in
+    match labels with
+      | e::es -> Gen.( oneofl labels >>= fun (i,it_opt) -> 
+        let it = match it_opt with
+          | Some t -> [t]
+          | None   -> []
+        in    
+        list (oneofl labels >>= fun (i',it_opt') -> return (Helper.as_phrase (Int32.of_int i'))) >>= fun ilist ->
+          return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::it)) )
+      | []    -> Gen.return None
 
 (*** Return ***) 
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -534,22 +514,12 @@ and return_gen (con: context_) t_opt size =
   in
   Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))
 
-(*(*** Return ***) (* TODO: get function return type *)
-(** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and return_gen (con: context_) t_opt size = 
-  let tlist = match List.nth_opt con.funcs con.funcindex with
-    | Some e -> (match snd e with
-      | Some t -> [t]
-      | None   -> [])
-    | None   -> []
-  in
-  Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))*)
-
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and call_gen (con: context_) t_opt size = 
-  match Helper.get_indexes_and_inputs2 t_opt con.funcs con.funcindex with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i, t_opt) -> 
+  let functions = Helper.get_indexes_and_inputs2 t_opt con.funcs con.funcindex in
+  match functions with
+    | e::es -> Gen.( oneofl functions >>= fun (i, t_opt) -> 
                 let tlist = t_opt in
                 return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev tlist))) )
     | []    -> Gen.return None
@@ -594,50 +564,6 @@ let rec drop_stat list_opt = match list_opt with
           | Ast.Drop      -> 1 + (nop_stat (Some (es)))
           | _             -> 0 + (nop_stat (Some (es)))
 
-
 let instr_gen context types = 
   Gen.(sized (fun n -> 
-    (*print_endline (string_of_int (List.length (fst types)));*)
     instrs_rule context (fst types) (snd types) n >>= fun instrs -> return instrs))
-    (*instrs_rule context [Types.I32Type] [Types.I32Type] n >>= fun instrs -> return instrs))*)
-
-(*
-let instr_gen context = Gen.sized (fun n -> instrs_rule context [] [Types.I32Type] n)
-
-let arb_intsr context = make ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)] (instr_gen context)
-*)
-
-
-(* 
-let instr_to_string (instr : Ast.instr) = 
-  let instr' = instr.it in
-    match instr' with
-    | Ast.Const v   -> Values.string_of_value v.it ^ " "
-    | Ast.Binary b  -> (match b with
-      | Values.I32 Ast.IntOp.Add  -> "Add "
-      | Values.I32 Ast.IntOp.Sub  -> "Sub "
-      | Values.I32 Ast.IntOp.Mul  -> "Mul "
-      | Values.I32 Ast.IntOp.DivS -> "DivS "
-      | Values.I32 Ast.IntOp.DivU -> "DivU "
-      | Values.I32 Ast.IntOp.RemS -> "RemS "
-      | Values.I32 Ast.IntOp.RemU -> "RemU "
-      | Values.I32 Ast.IntOp.And  -> "And "
-      | Values.I32 Ast.IntOp.Or   -> "Or "
-      | Values.I32 Ast.IntOp.Xor  -> "Xor "
-      | Values.I32 Ast.IntOp.Shl  -> "Shl "
-      | Values.I32 Ast.IntOp.ShrS -> "ShrS "
-      | Values.I32 Ast.IntOp.ShrU -> "ShrU "
-      | Values.I32 Ast.IntOp.Rotl -> "Rotl "
-      | Values.I32 Ast.IntOp.Rotr -> "Rotr ")
-    | Ast.Nop       -> "Nop "
-    | _             -> ""
-;;
-
-let rec instr_list_to_string list_opt = match list_opt with
-  | None            -> ""
-  | Some instr_list -> match instr_list with
-    | e::es -> (instr_to_string e) ^ (instr_list_to_string (Some es))
-    | []    -> ""
-;;
-
-*)
