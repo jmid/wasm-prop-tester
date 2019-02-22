@@ -136,38 +136,48 @@ let context_with_ftype con funcindex =
       } in
       con'
 
+let append_func (mod_: Ast.module_') func = 
+  let mod_' = {
+    Ast.types = mod_.types;
+    Ast.globals = mod_.globals;
+    Ast.tables = mod_.tables;
+    Ast.memories = mod_.memories;
+    Ast.funcs = mod_.funcs@[func];
+    Ast.start = mod_.start;
+    Ast.elems  = mod_.elems;
+    Ast.data = mod_.data;
+    Ast.imports = mod_.imports;
+    Ast.exports = mod_.exports;
+  } in
+  mod_'
+
 let module_gen = Gen.(context_gen >>= fun con -> 
   (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
-  let rec rec_func_gen func_types index = match func_types with
+  let rec rec_func_gen mod_ func_types index = match func_types with
     | e::rst -> let func_t = match snd e with
                   | Some t -> [t]
                   | None   -> []
                 in
-                (*
                 (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt -> 
                   (let instrs = match instrs_opt with
                       | Some inst -> inst
                       | None      -> [] 
                     in
-                    (as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) instrs)))
-                ) 
-                *)
-                (let instrs_opt = generate1 (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t)) in
-                  (let instrs = match instrs_opt with
-                    | Some inst -> inst
-                    | None      -> [] 
-                  in
-                  as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) instrs))
-                )::(rec_func_gen rst (index + 1) ) 
-    | []     -> [] in
-    let funcs = rec_func_gen con.funcs 0 in
-      return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) funcs con.mems con.globals))
+                    let func = as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) instrs) in
+                    let mod_' = append_func mod_ func in
+                     (rec_func_gen mod_' rst (index + 1) )
+                  )
+                )
+    | []     -> return mod_ in
+    let mod_ = get_module (func_type_list_to_type_phrase con.funcs) con.mems con.globals in
+    rec_func_gen mod_ con.funcs 0 >>= fun m ->
+      return (as_phrase m)
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1 
+  Test.make ~name:"Modules" ~count:2 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in

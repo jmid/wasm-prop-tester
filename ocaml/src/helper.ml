@@ -23,12 +23,12 @@ let string_to_name s =
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
 
-let get_module types funcs memories globals = {
+let get_module types memories globals = {
   Ast.types = types;
   Ast.globals = globals;
   Ast.tables = [];
   Ast.memories = memories;
-  Ast.funcs = funcs;
+  Ast.funcs = [];
   Ast.start = None;
   Ast.elems  = [];
   Ast.data = [];
