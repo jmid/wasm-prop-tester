@@ -8,8 +8,8 @@ type context_ = {
   funcs: (Types.stack_type * Types.value_type option) list;
   tables: (Types.value_type option * Types.stack_type) list;
   locals: Types.stack_type;
-  globals: Types.stack_type;
-  mems: Types.memory_type list;
+  globals: Ast.global list;
+  mems: Ast.memory list;
   return: Types.value_type option;
   funcindex: int;
 }
@@ -23,11 +23,11 @@ let string_to_name s =
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
 
-let get_module types funcs = {
+let get_module types funcs memories globals = {
   Ast.types = types;
-  Ast.globals = [];
+  Ast.globals = globals;
   Ast.tables = [];
-  Ast.memories = [];
+  Ast.memories = memories;
   Ast.funcs = funcs;
   Ast.start = None;
   Ast.elems  = [];
@@ -50,6 +50,7 @@ let types_ = [
   as_phrase (Types.FuncType ([], [Types.F64Type]))
 ];;
 
+(*
 (** get_indexes: a' -> a list -> int list **)
 let get_indexes a l =
   let rec get_index a' l' i = try match (List.nth l' i) = a' with
@@ -67,7 +68,7 @@ let get_random_element a l =
   let type_list = get_index a l 0 in
   match List.length type_list with
     | 0 -> None
-    | n -> Some (List.nth type_list (Random.int n))
+    | n -> try Some (List.nth type_list (Random.int n)) with Failure "nth" -> None
 
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
 let get_indexes_and_inputs a l =
@@ -93,7 +94,7 @@ let get_random_element2 a l index =
   let type_list = get_index a l 0 in
   match List.length type_list with
     | 0 -> None
-    | n -> Some (List.nth type_list (Random.int n))
+    | n -> try Some (List.nth type_list (Random.int n)) with Failure "nth" -> None
 
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
 let get_indexes_and_inputs2 a l index =
@@ -105,8 +106,9 @@ let get_indexes_and_inputs2 a l index =
   match get_random_element2 a l index with
     | Some t -> get_index_ot a t l 0
     | None   -> []
+    *)
 
-(*(** get_indexes: a' -> a list -> int list **)
+(** get_indexes: a' -> a list -> int list **)
 let get_indexes a l =
   let rec get_index a' l' i = match List.nth_opt l' i with
     | Some e  -> if a' = e then i::(get_index a' l' (i+1)) else get_index a' l' (i+1)
@@ -152,8 +154,7 @@ let get_indexes_and_inputs2 a l index =
     | None       -> [] in
   match get_random_element2 a l index with
     | Some t -> get_index_ot a t l 0
-    | None   -> []*)
-
+    | None   -> []
 
 (* 
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)

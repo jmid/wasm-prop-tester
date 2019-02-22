@@ -83,48 +83,64 @@ let rec instrs_rule context input_ts output_ts size =
               else Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])*)
 
 (** instr_rule : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
-and instr_rule con t_opt size = match t_opt with
+and instr_rule con t_opt size = 
+  let rules = match t_opt with
     | None   -> (match size with
-      | 0 -> let rules = [(1, nop_gen con t_opt size); (*1, drop_gen con t_opt size*)] in
-                  listPermuteTermGenOuter con t_opt size rules
-      | n -> let rules = [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
-                          (1, loop_gen con t_opt size)] in
-                  listPermuteTermGenOuter con t_opt size rules)
+      | 0 -> [(1, nop_gen con t_opt size); (*1, drop_gen con t_opt size*)]
+      | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size)])
     | Some _ -> (match size with 
-      | 0 -> let rules = [(1, const_gen con t_opt size)]; in
-                  listPermuteTermGenOuter con t_opt size rules
-      | n -> let rules = [ (1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
-                           (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);(**) (9, cvtop_gen con t_opt size); 
-                           (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
-                           (11, if_gen con t_opt size); (5, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
-                           (5, setLocal_gen con t_opt size); (5, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
-                           (1, setGlobal_gen con t_opt size); (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size);(**)
-                           (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);
-                           (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)] in
-                  listPermuteTermGenOuter con t_opt size rules)
+      | 0 -> [(1, const_gen con t_opt size)]
+      | n -> [(1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
+              (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);(**) (9, cvtop_gen con t_opt size); 
+              (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
+              (11, if_gen con t_opt size); (5, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
+              (5, setLocal_gen con t_opt size); (5, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);
+              (1, setGlobal_gen con t_opt size);*) (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size);(**)
+              (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);
+              (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)])
+  in listPermuteTermGenOuter rules
 
-and listPermuteTermGenOuter con goal size rules =
+and listPermuteTermGenOuter rules =
+  let rec remove ctw gw xs = match xs with
+      | e::rst -> let tw = ctw + (fst e) in
+        (match tw >= gw with
+          | true  -> rst
+          | false -> e::(remove tw gw rst))
+      | []  -> [] in
+  let rec toTerm ctw gw xs = match xs with
+      | e::rst -> let tw = ctw + (fst e) in
+        (match tw >= gw with
+          | true  -> Gen.(snd e >>= fun t -> match t with
+            | Some _ -> return t
+            | None   -> listPermuteTermGenOuter (remove 0 gw rules))    
+          | false -> toTerm tw gw rst)
+      | []  -> Gen.return None in
+  let tw = List.fold_left (fun t (w, g) -> t + w ) 0 rules in
+  Gen.( int_bound tw >>= fun gw -> toTerm 0 gw rules)
+
+(* 
   let indexed_rules = 
     let _,ig = List.fold_left 
       (fun (i,acc) (w,g) -> (i+1, (w, (i, g))::acc)) (0,[]) rules in
     ig in
-  let rec listPermuteTermGenInner con goal size irules = 
+  let rec listPermuteTermGenInner irules = 
     let rec removeAt n xs = match xs with
       | e::rst -> (match fst e = n with
         | true  -> rst
         | false -> e::(removeAt n rst))
       | []  -> [] in
-    let toTerm i g = Gen.(g >>= fun t -> match t with
+    let toTerm (i, g) = Gen.(g >>= fun t -> match t with
       | Some _ -> return t
       | None   ->
         let remainingRules = removeAt i irules in
-        listPermuteTermGenInner con goal size remainingRules) in
+        listPermuteTermGenInner remainingRules) in
 
     if irules = []
     then Gen.return None
-    else Gen.(frequencyl irules >>= (fun (i, g) -> toTerm i g))
+    else Gen.(frequencyl irules >>= toTerm)
   in
-  listPermuteTermGenInner con goal size indexed_rules  
+  listPermuteTermGenInner indexed_rules  
+  *)
 
 (*and listPermuteTermGenInner con goal size rules =
   let rec removeAt n xs = match (n, xs) with
@@ -508,9 +524,10 @@ and brtable_gen (con: context_) t_opt size =
 (*** Return ***) 
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and return_gen (con: context_) t_opt size = 
-  let tlist = match snd (List.nth con.funcs con.funcindex) with
+  let tlist = try match snd (List.nth con.funcs con.funcindex) with
     | Some t -> [t]
     | None   -> []
+  with Failure "nth" -> []
   in
   Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))
 

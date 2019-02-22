@@ -34,7 +34,7 @@ let wasm_to_file m =
 
 let context = {
   labels = [];
-  locals = [Types.I32Type; Types.F32Type];
+  locals = [];
   globals = [];
   funcs = [];
   mems = [];
@@ -69,18 +69,47 @@ let func_type_list_gen = Gen.(list_size small_nat func_type_gen)
 let func_type_list_gen2 = Gen.(list_size (int_bound 2) func_type_gen)
 ;;
 
+(** memory_gen : memory list **)
+let memory_gen = Gen.( 
+  let mem_gen = (small_int >>= fun min -> 
+    int_range min 65536 >>= fun max ->
+      oneofl [ Some (Int32.of_int max); None; ] >>= fun max_opt ->
+        let limits = {
+          Types.min = Int32.of_int min;
+          Types.max = max_opt;
+        } in
+        let memory = {
+          Ast.mtype = Types.MemoryType limits
+        } in
+        return [Helper.as_phrase memory])
+  in
+  oneof [ mem_gen; return []; ])
+
+(* as_phrase ({ Ast.gtype= Types.GlobalType (Types.I32Type, Immutable); Ast.value = as_phrase [] }) *)
+let globals_gen =
+  Gen.( oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t ->
+    Instr_gen.instr_gen context ([], [t]) >>= fun instrs_opt -> 
+    (let instrs = match instrs_opt with
+        | Some inst -> inst
+        | None      -> [] 
+      in
+      return []
+      (*return [(Helper.as_phrase ({ Ast.gtype = Types.GlobalType (t, Immutable); Ast.value = as_phrase instrs }))]*)))
+
 let context_gen = 
   Gen.(func_type_list_gen2 >>= fun funcs ->
-    return {
-      labels = [];
-      locals = [];
-      globals = [];
-      funcs = ([], Some (Types.I32Type))::funcs;
-      mems = [];
-      return = None;
-      tables = [];
-      funcindex = 0;
-    }
+    memory_gen >>= fun mems ->
+      globals_gen >>= fun globals ->
+        return {
+          labels = [];
+          locals = [];
+          globals = globals;
+          funcs = ([], Some (Types.I32Type))::funcs;
+          mems = mems;
+          return = None;
+          tables = [];
+          funcindex = 0;
+        }
   )
 
 let rec func_type_list_to_type_phrase func_type_list = match func_type_list with
@@ -114,6 +143,15 @@ let module_gen = Gen.(context_gen >>= fun con ->
                   | Some t -> [t]
                   | None   -> []
                 in
+                (*
+                (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt -> 
+                  (let instrs = match instrs_opt with
+                      | Some inst -> inst
+                      | None      -> [] 
+                    in
+                    (as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) instrs)))
+                ) 
+                *)
                 (let instrs_opt = generate1 (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t)) in
                   (let instrs = match instrs_opt with
                     | Some inst -> inst
@@ -123,13 +161,13 @@ let module_gen = Gen.(context_gen >>= fun con ->
                 )::(rec_func_gen rst (index + 1) ) 
     | []     -> [] in
     let funcs = rec_func_gen con.funcs 0 in
-      return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) funcs))
+      return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) funcs con.mems con.globals))
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:10 
+  Test.make ~name:"Modules" ~count:1 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
