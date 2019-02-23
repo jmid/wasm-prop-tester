@@ -23,12 +23,12 @@ let string_to_name s =
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
 
-let get_module types memories globals = {
+let get_module types funcs memories globals = {
   Ast.types = types;
   Ast.globals = globals;
   Ast.tables = [];
   Ast.memories = memories;
-  Ast.funcs = [];
+  Ast.funcs = funcs;
   Ast.start = None;
   Ast.elems  = [];
   Ast.data = [];
@@ -50,12 +50,12 @@ let types_ = [
   as_phrase (Types.FuncType ([], [Types.F64Type]))
 ];;
 
-(*
+
 (** get_indexes: a' -> a list -> int list **)
 let get_indexes a l =
   let rec get_index a' l' i = try match (List.nth l' i) = a' with
     | true  -> i::(get_index a' l' (i+1)) 
-    | false -> get_index a' l' (i+1) with Failure "nth" -> [] in
+    | false -> get_index a' l' (i+1) with Failure _ -> [] in
   get_index a l 0
 
 (** get_random_element: 'a -> ('a * 'b) list -> 'b **)
@@ -64,11 +64,11 @@ let get_random_element a l =
     let element = List.nth l' i in
     match snd element = a' with
       | true  -> (fst element)::(get_index a' l' (i+1))
-      | false -> get_index a' l' (i+1) with Failure "nth" -> [] in
+      | false -> get_index a' l' (i+1) with Failure _ -> [] in
   let type_list = get_index a l 0 in
   match List.length type_list with
     | 0 -> None
-    | n -> try Some (List.nth type_list (Random.int n)) with Failure "nth" -> None
+    | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None
 
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
 let get_indexes_and_inputs a l =
@@ -76,7 +76,7 @@ let get_indexes_and_inputs a l =
     let element = List.nth l' i in
     match snd element = a' && fst element = b' with
       | true  -> (i,(snd element))::(get_index_ot a' b' l' (i+1))
-      | false -> get_index_ot a' b' l' (i+1) with Failure "nth" -> [] in
+      | false -> get_index_ot a' b' l' (i+1) with Failure _ -> [] in
   match get_random_element a l with
     | Some t -> get_index_ot a t l 0
     | None   -> []
@@ -90,11 +90,11 @@ let get_random_element2 a l index =
       let element = List.nth l' i in
       match snd element = a' with
         | true  -> (fst element)::(get_index a' l' (i+1))
-        | false -> get_index a' l' (i+1) with Failure "nth" -> [] in
+        | false -> get_index a' l' (i+1) with Failure _ -> [] in
   let type_list = get_index a l 0 in
   match List.length type_list with
     | 0 -> None
-    | n -> try Some (List.nth type_list (Random.int n)) with Failure "nth" -> None
+    | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None
 
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
 let get_indexes_and_inputs2 a l index =
@@ -102,12 +102,13 @@ let get_indexes_and_inputs2 a l index =
     let element = List.nth l' i in
     match snd element = a' && fst element = b' with
       | true  -> (i,(fst element))::(get_index_ot a' b' l' (i+1))
-      | false -> get_index_ot a' b' l' (i+1) with Failure "nth" -> [] in
+      | false -> get_index_ot a' b' l' (i+1) with Failure _ -> [] in
   match get_random_element2 a l index with
     | Some t -> get_index_ot a t l 0
     | None   -> []
-    *)
+    
 
+(*
 (** get_indexes: a' -> a list -> int list **)
 let get_indexes a l =
   let rec get_index a' l' i = match List.nth_opt l' i with
@@ -155,6 +156,7 @@ let get_indexes_and_inputs2 a l index =
   match get_random_element2 a l index with
     | Some t -> get_index_ot a t l 0
     | None   -> []
+*)
 
 (* 
 (** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)

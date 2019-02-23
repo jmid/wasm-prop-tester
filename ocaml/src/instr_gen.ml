@@ -118,49 +118,6 @@ and listPermuteTermGenOuter rules =
   let tw = List.fold_left (fun t (w, g) -> t + w ) 0 rules in
   Gen.( int_bound tw >>= fun gw -> toTerm 0 gw rules)
 
-(* 
-  let indexed_rules = 
-    let _,ig = List.fold_left 
-      (fun (i,acc) (w,g) -> (i+1, (w, (i, g))::acc)) (0,[]) rules in
-    ig in
-  let rec listPermuteTermGenInner irules = 
-    let rec removeAt n xs = match xs with
-      | e::rst -> (match fst e = n with
-        | true  -> rst
-        | false -> e::(removeAt n rst))
-      | []  -> [] in
-    let toTerm (i, g) = Gen.(g >>= fun t -> match t with
-      | Some _ -> return t
-      | None   ->
-        let remainingRules = removeAt i irules in
-        listPermuteTermGenInner remainingRules) in
-
-    if irules = []
-    then Gen.return None
-    else Gen.(frequencyl irules >>= toTerm)
-  in
-  listPermuteTermGenInner indexed_rules  
-  *)
-
-(*and listPermuteTermGenInner con goal size rules =
-  let rec removeAt n xs = match (n, xs) with
-    | (0, x::xs) -> xs
-    | (n, x::xs) -> x :: removeAt (n - 1) xs
-    | _          -> failwith "index out of bounds" in
-  let elementsWeighted xs =
-    let _,ig = List.fold_left
-      (fun (i,acc) (w,g) -> (i+1,(w,Gen.pair (Gen.return i) g)::acc)) (0,[]) xs in
-    Gen.frequency ig in
-  let toTerm i = function
-      | Some term -> Gen.return (Some term)
-      | None      ->
-        let remainingRules = removeAt i rules in
-        listPermuteTermGenInner con goal size remainingRules in
-
-  if rules = []
-  then Gen.return None
-  else Gen.(elementsWeighted rules >>= (fun (i,t) -> toTerm i t))*)
-
 (**** Numeric Instructions ****)
 
 (*** Const ***)
@@ -527,7 +484,7 @@ and return_gen (con: context_) t_opt size =
   let tlist = try match snd (List.nth con.funcs con.funcindex) with
     | Some t -> [t]
     | None   -> []
-  with Failure "nth" -> []
+  with Failure _ -> []
   in
   Gen.return (Some (con, Helper.as_phrase Ast.Return, tlist))
 
@@ -554,7 +511,7 @@ and callindirect_gen (con: context_) t_opt size =
 
 
 
-(*** Statistics ***)
+(*(*** Statistics ***)
 let length_stat list_opt = match list_opt with
   | None            -> 0
   | Some instr_list -> List.length instr_list
@@ -579,7 +536,7 @@ let rec drop_stat list_opt = match list_opt with
       | (e : Ast.instr)::es   -> let instr' = e.it in
           match instr' with
           | Ast.Drop      -> 1 + (nop_stat (Some (es)))
-          | _             -> 0 + (nop_stat (Some (es)))
+          | _             -> 0 + (nop_stat (Some (es)))*)
 
 let instr_gen context types = 
   Gen.(sized (fun n -> 
