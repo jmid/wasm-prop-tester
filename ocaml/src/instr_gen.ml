@@ -94,8 +94,8 @@ and instr_rule con t_opt size =
               (9, testop_gen con t_opt size); (9, relop_gen con t_opt size);(**) (9, cvtop_gen con t_opt size); 
               (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
               (11, if_gen con t_opt size); (5, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
-              (5, setLocal_gen con t_opt size); (5, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);
-              (1, setGlobal_gen con t_opt size);*) (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size);(**)
+              (5, setLocal_gen con t_opt size); (5, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
+              (11, setGlobal_gen con t_opt size);(**) (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size);(**)
               (11, br_gen con t_opt size); (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size);
               (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)])
   in listPermuteTermGenOuter rules
@@ -300,7 +300,7 @@ and teeLocal_gen (con: context_) t_opt size = match t_opt with
 (*** GetGlobal ***)
 (** getGlobal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and getGlobal_gen (con: context_) t_opt size = match t_opt with
-  | Some t -> (let globals = Helper.get_indexes t con.globals in
+  | Some t -> (let globals = Helper.get_global_indexes t con.globals None in
     match globals with
       | e::es -> Gen.( oneofl globals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.GetGlobal (Helper.as_phrase (Int32.of_int i))), [])) )
       | []    -> Gen.return None )
@@ -310,8 +310,8 @@ and getGlobal_gen (con: context_) t_opt size = match t_opt with
 (** setGlobal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and setGlobal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
-  | None -> Gen.( oneofl con.globals >>= 
-    fun t -> (let globals = Helper.get_indexes t con.globals in
+  | None -> Gen.( oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> 
+              (let globals = Helper.get_global_indexes t con.globals (Some Types.Mutable) in
                 match globals with
                   | e::es -> Gen.( oneofl globals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetGlobal (Helper.as_phrase (Int32.of_int i))), [t])) )
                   | []    -> Gen.return None ))

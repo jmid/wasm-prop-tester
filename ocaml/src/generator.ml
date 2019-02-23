@@ -126,7 +126,7 @@ let context_gen =
         labels = [];
         locals = [];
         globals = [];
-        funcs = ([], Some (Types.I32Type))::funcs;
+        funcs = ([], None)::([], Some (Types.I32Type))::funcs;
         mems = mems;
         return = None;
         tables = [];
@@ -193,7 +193,8 @@ let module_test =
   )
 ;;
 
-QCheck_runner.set_seed(294956219);;
+
+(*QCheck_runner.set_seed(294956219);;*)
 QCheck_runner.run_tests ~verbose:true [ module_test; ] ;;
 
 (*

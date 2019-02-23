@@ -29,14 +29,14 @@ let get_module types funcs memories globals = {
   Ast.tables = [];
   Ast.memories = memories;
   Ast.funcs = funcs;
-  Ast.start = None;
+  Ast.start = Some (as_phrase 0l);
   Ast.elems  = [];
   Ast.data = [];
   Ast.imports = [];
   Ast.exports = [
     as_phrase ({
       Ast.name = string_to_name "aexp";
-      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 0l));
+      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 1l));
     })
   ];
 }
@@ -57,6 +57,25 @@ let get_indexes a l =
     | true  -> i::(get_index a' l' (i+1)) 
     | false -> get_index a' l' (i+1) with Failure _ -> [] in
   get_index a l 0
+
+(** get_global_indexes: a' -> a list -> int list **)
+let get_global_indexes a l m =
+  let rec get_index a' l' i = try 
+   let (global: Ast.global) = (List.nth l' i) in
+   match global.it.gtype with
+    | Types.GlobalType (t', m') -> 
+      (match t' = a' with
+        | true  -> 
+          (match m with
+            | Some n -> 
+              if n = m'
+              then i::(get_index a' l' (i+1)) 
+              else get_index a' l' (i+1)
+            | None   -> i::(get_index a' l' (i+1)))
+        | false -> get_index a' l' (i+1))
+    | _                       -> (get_index a' l' (i+1))
+    with Failure _ -> [] in
+    get_index a l 0
 
 (** get_random_element: 'a -> ('a * 'b) list -> 'b **)
 let get_random_element a l =
