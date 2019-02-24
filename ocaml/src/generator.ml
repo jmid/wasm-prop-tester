@@ -193,7 +193,7 @@ let module_test =
   )
 ;;
 
-
+QCheck_runner.set_seed(294956219);;
 (*QCheck_runner.set_seed(294956219);;*)
 QCheck_runner.run_tests ~verbose:true [ module_test; ] ;;
 
