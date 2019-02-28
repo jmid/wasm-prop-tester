@@ -26,12 +26,6 @@ and instr' =
   | MemorySize                        (* size of linear memory *)
   | MemoryGrow                        (* grow linear memory *)
 
-
-  | GetGlobal of var                  (* read global variable *)
-  | SetGlobal of var                  (* write global variable *)
-  
-
-  | Call of var                       (* call function *)
   | CallIndirect of var               (* call function through table *)
 
 
@@ -55,6 +49,9 @@ and instr' =
   | Br of var                         (* break to n-th surrounding label *)
   | BrIf of var                       (* conditional break *)
   | BrTable of var list * var         (* indexed break *)
+  | GetGlobal of var                  (* read global variable *)
+  | SetGlobal of var                  (* write global variable *)
+  | Call of var                       (* call function *)
 *)
 
 (*** Instructions list generator ***)
@@ -65,8 +62,7 @@ let rec instrs_rule context input_ts output_ts size =
           | Some (con', instr', ts')  -> 
             instrs_rule con' input_ts (ts'@tr) (size/2) >>= (function
               | None        -> return None
-              | Some instrs ->
-                return (Some (instrs@[instr'])) ) ) in
+              | Some instrs -> return (Some (instr'::instrs)) ) ) in
     match output_ts with
           []          -> 
             let empty_gen = recgen context None [] in
@@ -86,11 +82,11 @@ let rec instrs_rule context input_ts output_ts size =
 and instr_rule con t_opt size = 
   let rules = match t_opt with
     | None   -> (match size with
-      | 0 -> [(1, nop_gen con t_opt size); (1, setGlobal_gen con t_opt size);]
+      | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size);]
       | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
-              (1, loop_gen con t_opt size); (1, setGlobal_gen con t_opt size);])
+              (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size);])
     | Some _ -> (match size with 
-      | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);]
+      | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
       | n -> [(1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
               (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); 
               (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
@@ -99,25 +95,27 @@ and instr_rule con t_opt size =
               (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (11, br_gen con t_opt size); 
               (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size); 
               (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)])
-  in listPermuteTermGenOuter rules
+  in generate_rule rules
 
-and listPermuteTermGenOuter rules =
+and generate_rule rules =
   let rec remove ctw gw xs = match xs with
       | e::rst -> let tw = ctw + (fst e) in
         (match tw >= gw with
           | true  -> rst
           | false -> e::(remove tw gw rst))
       | []  -> [] in
-  let rec toTerm ctw gw xs = match xs with
+  let rec verify ctw gw xs = match xs with
       | e::rst -> let tw = ctw + (fst e) in
         (match tw >= gw with
           | true  -> Gen.(snd e >>= fun t -> match t with
             | Some _ -> return t
-            | None   -> listPermuteTermGenOuter (remove 0 gw rules))    
-          | false -> toTerm tw gw rst)
+            | None   -> generate_rule (remove 0 gw rules))    
+          | false -> verify tw gw rst)
       | []  -> Gen.return None in
   let tw = List.fold_left (fun t (w, g) -> t + w ) 0 rules in
-  Gen.( int_bound tw >>= fun gw -> toTerm 0 gw rules)
+    match tw with
+     | 0 -> Gen.return None
+     | _ -> Gen.( int_range 1 tw >>= fun gw -> verify 0 gw rules)
 
 (**** Numeric Instructions ****)
 
@@ -283,11 +281,12 @@ and getLocal_gen (con: context_) t_opt size = match t_opt with
 (** setLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and setLocal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
-  | None -> Gen.( oneofl con.locals >>= 
-    fun t -> (let locals = Helper.get_indexes t con.locals in
-                match locals with
-                  | e::es -> Gen.( oneofl locals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
-                  | []    -> Gen.return None ))
+  | None -> match List.length con.locals with
+    | 0 -> Gen.return None
+    | n -> Gen.( int_range 1 n >>= fun g -> 
+      let i = g - 1 in
+      let t = List.nth con.locals i in
+        return (Some (con, Helper.as_phrase (Ast.SetLocal (Helper.as_phrase (Int32.of_int i))), [t])) )
 
 (*** TeeLocal ***)
 (** teeLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -407,7 +406,7 @@ and block_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (t_opt, t_opt) con) [] ot size >>= 
     fun instrs_opt -> match instrs_opt with
-      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (ot, instrs)), []))
+      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (ot, (List.rev instrs))), []))
       | None        -> return (Some (con, Helper.as_phrase (Ast.Block (ot, [])), [])) )
 
 (*** Loop ***)
@@ -419,7 +418,7 @@ and loop_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (None, t_opt) con) [] ot size >>= 
     fun instrs_opt -> match instrs_opt with
-      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (ot, instrs)), []))
+      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (ot, (List.rev instrs))), []))
       | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (ot, [])), [])) )
 
 (*** If ***)
@@ -438,7 +437,7 @@ and if_gen (con: context_) t_opt size =
         and instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some (con, Helper.as_phrase (Ast.If (ot, instrs1, instrs2)), [Types.I32Type])) )
+        return (Some (con, Helper.as_phrase (Ast.If (ot, (List.rev instrs1), (List.rev instrs2))), [Types.I32Type])) )
 
 (*** Br ***)
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)

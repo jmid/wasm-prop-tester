@@ -105,7 +105,7 @@ let globals_gen con =
     match glist with
       | t::rst -> let t_opt = Some (t) in
         let rules = [ (1, const_gen con' t_opt 1); (*(11, getGlobal_gen con' t_opt 1);*) ] in
-        (Instr_gen.listPermuteTermGenOuter rules >>= fun instrs_opt -> 
+        (Instr_gen.generate_rule rules >>= fun instrs_opt -> 
           (match instrs_opt with
             | Some (con'', inst, ts') -> 
               oneofl [ Types.Immutable; Types.Mutable; ] >>= fun mutability ->
@@ -171,19 +171,19 @@ let module_gen = Gen.(context_gen >>= fun context ->
                         | Some inst -> inst
                         | None      -> [] 
                       in
-                      let func = as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) instrs) in
-                        rec_func_gen (res@[func]) rst (index + 1)
+                      let func = as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) (List.rev instrs)) in
+                        rec_func_gen (func::res) rst (index + 1)
                     )
                   )
       | []     -> return res in
       rec_func_gen [] con.funcs 0 >>= fun funcs ->
-        return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) funcs con.mems con.globals))
+        return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) (List.rev funcs) con.mems con.globals))
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1 
+  Test.make ~name:"Modules" ~count:5 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
