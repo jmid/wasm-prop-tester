@@ -482,7 +482,7 @@ and brtable_gen (con: context_) t_opt size =
 (*** Return ***) 
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and return_gen (con: context_) t_opt size = 
-  let tlist = try match snd (List.nth con.funcs con.funcindex) with
+  let tlist = try match snd (List.nth (con.imports@con.funcs) con.funcindex) with
     | Some t -> [t]
     | None   -> []
   with Failure _ -> []
