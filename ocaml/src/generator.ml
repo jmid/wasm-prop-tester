@@ -37,6 +37,7 @@ let context = {
   locals = [];
   globals = [];
   funcs = [];
+  imports = [];
   mems = [];
   return = None;
   tables = [];
@@ -91,6 +92,7 @@ let append_global con global =
     locals = con.locals;
     globals = con.globals@[global];
     funcs = con.funcs;
+    imports = con.imports;
     mems = con.mems;
     return = con.return;
     tables = con.tables;
@@ -127,6 +129,7 @@ let context_gen =
         locals = [];
         globals = [];
         funcs = ([], None)::([], Some (Types.I32Type))::funcs;
+        imports = [([Types.I32Type], None)];
         mems = mems;
         return = None;
         tables = [];
@@ -151,10 +154,11 @@ let context_with_ftype con funcindex =
         locals = con.locals;
         globals = con.globals;
         funcs = con.funcs;
+        imports = con.imports;
         mems = con.mems;
         return = None;
         tables = con.tables;
-        funcindex = funcindex;
+        funcindex = funcindex + 1;
       } in
       con'
 
@@ -171,19 +175,19 @@ let module_gen = Gen.(context_gen >>= fun context ->
                         | Some inst -> inst
                         | None      -> [] 
                       in
-                      let func = as_phrase (get_func (fst e) (as_phrase (Int32.of_int index)) (List.rev instrs)) in
+                      let func = as_phrase (get_func (fst e) (as_phrase (Int32.of_int (index + 1))) (List.rev instrs)) in
                         rec_func_gen (func::res) rst (index + 1)
                     )
                   )
       | []     -> return res in
       rec_func_gen [] con.funcs 0 >>= fun funcs ->
-        return (as_phrase (get_module (func_type_list_to_type_phrase con.funcs) (List.rev funcs) con.mems con.globals))
+        return (as_phrase (get_module (func_type_list_to_type_phrase (([Types.I32Type], None)::con.funcs)) (List.rev funcs) con.mems con.globals))
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:5 
+  Test.make ~name:"Modules" ~count:1 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in

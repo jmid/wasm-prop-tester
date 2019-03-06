@@ -6,6 +6,7 @@ type context_ = {
   (*labels: (Types.value_type option * Types.stack_type) list;*)
   labels: (Types.value_type option * Types.value_type option) list;
   funcs: (Types.stack_type * Types.value_type option) list;
+  imports: (Types.stack_type * Types.value_type option) list;
   tables: (Types.value_type option * Types.stack_type) list;
   locals: Types.stack_type;
   globals: Ast.global list;
@@ -29,10 +30,16 @@ let get_module types funcs memories globals = {
   Ast.tables = [];
   Ast.memories = memories;
   Ast.funcs = funcs;
-  Ast.start = Some (as_phrase 0l);
+  Ast.start = Some (as_phrase 1l);
   Ast.elems  = [];
   Ast.data = [];
-  Ast.imports = [];
+  Ast.imports = [
+    as_phrase({
+      Ast.module_name = string_to_name "imports";
+      Ast.item_name = string_to_name "log";
+      Ast.idesc = as_phrase (Ast.FuncImport (as_phrase 0l))
+    })
+  ];
   Ast.exports = [
     as_phrase ({
       Ast.name = string_to_name "aexp";

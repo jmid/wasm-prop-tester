@@ -38,11 +38,11 @@ then
     exit "$ERROR"
 fi
 
-timeout 60 wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> >(sed "s/.*\(integer\)/--> \1/") | sed "s/\(-\?[0-9]\+\).*/--> \1/" > $TMP_REF
-timeout 60 ch "$JS_FILE" > $TMP_CH 2>&1
-timeout 60 v8 "$JS_FILE" > $TMP_V8 2>&1
-timeout 60 sm "$JS_FILE" > $TMP_SM 2>&1
-timeout 60 jsc "$JS_FILE" > $TMP_JSC 2>&1
+timeout 2 wasm "$WASM_FILE" -e "(invoke \"aexp\")" 2> >(sed "s/.*\(integer\)/--> \1/") | sed "s/\(-\?[0-9]\+\).*/--> \1/" > $TMP_REF
+timeout 2 ch "$JS_FILE" > $TMP_CH 2>&1
+timeout 2 v8 "$JS_FILE" > $TMP_V8 2>&1
+timeout 2 sm "$JS_FILE" > $TMP_SM 2>&1
+timeout 2 jsc "$JS_FILE" > $TMP_JSC 2>&1
 
 cmp -s $TMP_REF $TMP_CH
 REF_CH=$?
