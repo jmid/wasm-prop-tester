@@ -83,19 +83,19 @@ let rec instrs_rule context input_ts output_ts size =
 and instr_rule con t_opt size = 
   let rules = match t_opt with
     | None   -> (match size with
-      | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (11, call_gen con t_opt size);]
+      | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (*(1, call_gen con t_opt size);*)]
       | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
-              (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (11, call_gen con t_opt size);])
+              (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (1, call_gen con t_opt size);])
     | Some _ -> (match size with 
       | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
       | n -> [(1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
               (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); 
               (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
-              (11, if_gen con t_opt size); (5, select_gen con t_opt size); (11, getLocal_gen con t_opt size);
-              (5, setLocal_gen con t_opt size); (5, teeLocal_gen con t_opt size); (11, getGlobal_gen con t_opt size);
+              (11, if_gen con t_opt size); (5, select_gen con t_opt size); (*(11, getLocal_gen con t_opt size);*)
+              (*(5, setLocal_gen con t_opt size);*) (5, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);*)
               (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (11, br_gen con t_opt size); 
               (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size); 
-              (11, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)])
+              (1, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)])
   in generate_rule rules
 
 and generate_rule rules =
@@ -492,11 +492,9 @@ and return_gen (con: context_) t_opt size =
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and call_gen (con: context_) t_opt size = 
-  let functions = Helper.get_indexes_and_inputs2 t_opt (con.imports@con.funcs) con.funcindex in
-  match functions with
-    | e::es -> Gen.( oneofl functions >>= fun (i, t_opt) -> 
-                return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev t_opt))) )
-    | []    -> Gen.return None
+  match Helper.get_random_global t_opt (con.imports@con.funcs) con.funcindex with
+   | Some (i,t) -> Gen.return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev t)))
+   | None       -> Gen.return None
 
 (*
 (*** CallIndirect ***)

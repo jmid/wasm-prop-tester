@@ -65,23 +65,32 @@ let get_indexes a l =
     | false -> get_index a' l' (i+1) with Failure _ -> [] in
   get_index a l 0
 
+let typeToString a = Types.string_of_value_type a
+
+let mToString = function
+  | Some m -> (match m with 
+    | Types.Mutable   -> "Mutable"
+    | Types.Immutable -> "Immutable")
+  | None   -> "None"
+
 (** get_global_indexes: a' -> a list -> int list **)
 let get_global_indexes a l m =
-  let rec get_index a' l' i = try 
-   let (global: Ast.global) = (List.nth l' i) in
-   match global.it.gtype with
-    | Types.GlobalType (t', m') -> 
-      (match t' = a' with
-        | true  -> 
-          (match m with
-            | Some n -> 
-              if n = m'
-              then i::(get_index a' l' (i+1)) 
-              else get_index a' l' (i+1)
-            | None   -> i::(get_index a' l' (i+1)))
-        | false -> get_index a' l' (i+1))
-    | _                       -> (get_index a' l' (i+1))
-    with Failure _ -> [] in
+  let rec get_index a' l' i = try
+    let (global: Ast.global) = (List.nth l' i) in
+    let check = function
+      Types.GlobalType (t', m') -> 
+        (match t' = a' with
+          | true  -> 
+            (match m with
+              | Some n -> 
+                if n = m'
+                then i::(get_index a' l' (i+1)) 
+                else get_index a' l' (i+1)
+              | None   -> i::(get_index a' l' (i+1)))
+          | false -> get_index a' l' (i+1)) in
+      check global.it.gtype
+      with Failure _ -> [] in
+    (*print_endline ((string_of_int (List.length l))^" "^(typeToString a)^" "^(mToString m));*)
     get_index a l 0
 
 (** get_random_element: 'a -> ('a * 'b) list -> 'b **)
@@ -108,31 +117,20 @@ let get_indexes_and_inputs a l =
     | None   -> []
 
 
-(** get_random_element: 'a -> ('a * 'b) list -> 'b **)
-let get_random_element2 a l index =
-  let rec get_index a' l' i = match i = index with
-    | true  -> get_index a' l' (i+1)
-    | false -> try
-      let element = List.nth l' i in
-      match snd element = a' with
-        | true  -> (fst element)::(get_index a' l' (i+1))
-        | false -> get_index a' l' (i+1) with Failure _ -> [] in
+(** get_random_global: 'a -> ('a * 'b) list -> int -> 'b **)
+let get_random_global a l index =
+  let rec get_index a' l' i = 
+    match i = index with
+      | true  -> get_index a' l' (i+1)
+      | false -> (try
+        let element = List.nth l' i in
+        match snd element = a' with
+          | true  -> (i,(fst element))::(get_index a' l' (i+1))
+          | false -> get_index a' l' (i+1) with Failure _ -> []) in
   let type_list = get_index a l 0 in
   match List.length type_list with
     | 0 -> None
-    | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None
-
-(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
-let get_indexes_and_inputs2 a l index =
-  let rec get_index_ot a' b' l' i =  try
-    let element = List.nth l' i in
-    match snd element = a' && fst element = b' with
-      | true  -> (i,(fst element))::(get_index_ot a' b' l' (i+1))
-      | false -> get_index_ot a' b' l' (i+1) with Failure _ -> [] in
-  match get_random_element2 a l index with
-    | Some t -> get_index_ot a t l 0
-    | None   -> []
-    
+    | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None     
 
 (*
 (** get_indexes: a' -> a list -> int list **)

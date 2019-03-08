@@ -187,7 +187,7 @@ let module_gen = Gen.(context_gen >>= fun context ->
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1 
+  Test.make ~name:"Modules" ~count:10 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
