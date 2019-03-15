@@ -23,10 +23,6 @@ and instr' =
   | Load of loadop                    (* read memory at address *)
   | Store of storeop                  (* write memory at address *)
 
-
-  | MemorySize                        (* size of linear memory *)
-  | MemoryGrow                        (* grow linear memory *)
-
   | CallIndirect of var               (* call function through table *)
 
 
@@ -53,6 +49,8 @@ and instr' =
   | GetGlobal of var                  (* read global variable *)
   | SetGlobal of var                  (* write global variable *)
   | Call of var                       (* call function *)
+  | MemorySize                        (* size of linear memory *)
+  | MemoryGrow                        (* grow linear memory *)
 *)
 
 (*** Instructions list generator ***)
@@ -85,7 +83,8 @@ and instr_rule con t_opt size =
     | None   -> (match size with
       | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (*(1, call_gen con t_opt size);*)]
       | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
-              (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (1, call_gen con t_opt size);])
+              (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); 
+              (1, call_gen con t_opt size); (*(11, store_gen con t_opt size);*)])
     | Some _ -> (match size with 
       | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
       | n -> [(1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
@@ -95,7 +94,8 @@ and instr_rule con t_opt size =
               (*(5, setLocal_gen con t_opt size);*) (5, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);*)
               (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (11, br_gen con t_opt size); 
               (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size); 
-              (1, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)])
+              (1, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)
+              (1, memorysize_gen con t_opt size); (1, memorygrow_gen con t_opt size);])
   in generate_rule rules
 
 and generate_rule rules =
@@ -347,25 +347,25 @@ and load_gen con t_opt size = match t_opt with
 (** align_store_gen **)
 and align_store_gen t p_opt = 
   let width = match p_opt with
-    | Some p -> Memory.packed_size p
+    | Some p -> Memory.packed_size p 
     | None   -> Types.size t
   in
-  Gen.(int_range 1 width >>= fun i -> return i)
+  Gen.(int_range 0 width >>= fun i -> return 0)
 
 (*** Store ***)
 (** store_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and store_gen con t_opt size = match t_opt with
   | Some _ -> Gen.return None
-  | None   -> Gen.(oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t ->
-    frequency [ 1, return None; 3, (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
+  | None   -> Gen.(oneofl [Types.I32Type; (*Types.I64Type; Types.F32Type; Types.F64Type;*)] >>= fun t ->
+    frequency [ 1, return None; 3, (oneofl [Memory.Pack8; Memory.Pack16; (*Memory.Pack32;*)] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
       pair (align_store_gen t p_opt) (ui32) >>= fun (align, offset) ->
         let mop = {
           Ast.ty = t; 
-          Ast.align = align; 
-          Ast.offset = offset; 
+          Ast.align = 0; 
+          Ast.offset = 0l; 
           Ast.sz = p_opt
         } in
-        return (Some (con, Helper.as_phrase (Ast.Store mop), [Types.I32Type; t])))
+        return (Some (con, Helper.as_phrase (Ast.Store mop), [t; Types.I32Type ])))
     
 
 (*** MemorySize ***)

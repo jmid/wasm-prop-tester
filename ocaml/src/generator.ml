@@ -35,7 +35,12 @@ let wasm_to_file m =
 let context = {
   labels = [];
   locals = [];
-  globals = [];
+  globals = {
+    i32 = [];
+    i64 = [];
+    f32 = [];
+    f64 = [];
+  };
   funcs = [];
   imports = [];
   mems = [];
@@ -84,25 +89,11 @@ let memory_gen = Gen.(
         } in
         return [Helper.as_phrase memory])
   in
-  oneof [ mem_gen; return []; ])
-
-let append_global con global = 
-  let con' = {
-    labels = con.labels;
-    locals = con.locals;
-    globals = con.globals@[global];
-    funcs = con.funcs;
-    imports = con.imports;
-    mems = con.mems;
-    return = con.return;
-    tables = con.tables;
-    funcindex = con.funcindex;
-  } in
-  con'
+  oneof [ mem_gen; (*return [];*) ])
 
 (* as_phrase ({ Ast.gtype= Types.GlobalType (Types.I32Type, Immutable); Ast.value = as_phrase [] }) *)
 let globals_gen con =
-  let rec rec_glob_gen con' glist = 
+  let rec rec_glob_gen con' globals glist = 
     Gen.(
     match glist with
       | t::rst -> let t_opt = Some (t) in
@@ -111,15 +102,68 @@ let globals_gen con =
           (match instrs_opt with
             | Some (con'', inst, ts') -> 
               oneofl [ Types.Immutable; Types.Mutable; ] >>= fun mutability ->
-                let global = (Helper.as_phrase ({ Ast.gtype = Types.GlobalType (t, mutability); Ast.value = as_phrase [inst] })) in
-                  (rec_glob_gen (append_global con' global) rst) 
-            | None                    -> (rec_glob_gen con' rst) 
+                (rec_glob_gen con' (globals@[(t, mutability, inst)]) rst) 
+            | None                    -> (rec_glob_gen con' globals rst) 
           ))
-      | []     -> return con' )
+      | []     -> return globals )
   in
-  Gen.( list (oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type]) >>= fun glist ->
-    rec_glob_gen con glist >>= fun con' -> return con'
+  Gen.( list (oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type]) >>= fun tlist ->
+    let triples = [] in
+    rec_glob_gen con triples tlist >>= fun globals -> return globals
   )
+
+let triple_to_global = function (t, m, inst) ->
+  (Helper.as_phrase ({ Ast.gtype = Types.GlobalType (t, m); Ast.value = as_phrase [inst] }))
+
+let process_globals con gtypelist =
+  let rec rec_glob_process globals glist index = 
+    match glist with
+      | g::rst -> 
+        let nglobals = function (t, m, inst) -> 
+            (match t with
+              | Types.I32Type -> 
+                {
+                  i32 = globals.i32@[(index, m)];
+                  i64 = globals.i64;
+                  f32 = globals.f32;
+                  f64 = globals.f64;
+                }
+              | Types.I64Type -> 
+                {
+                  i32 = globals.i32;
+                  i64 = globals.i64@[(index, m)];
+                  f32 = globals.f32;
+                  f64 = globals.f64;
+                }
+              | Types.F32Type -> 
+                {
+                  i32 = globals.i32;
+                  i64 = globals.i64;
+                  f32 = globals.f32@[(index, m)];
+                  f64 = globals.f64;
+                }
+              | Types.F64Type -> 
+                {
+                  i32 = globals.i32;
+                  i64 = globals.i64;
+                  f32 = globals.f32;
+                  f64 = globals.f64@[(index, m)];
+                }) in
+        rec_glob_process (nglobals g) rst (index + 1)
+      | []     -> globals
+  in
+  let globals = rec_glob_process con.globals gtypelist 0 in
+  {
+    labels = con.labels;
+    locals = con.locals;
+    globals = globals;
+    funcs = con.funcs;
+    imports = con.imports;
+    mems = con.mems;
+    return = con.return;
+    tables = con.tables;
+    funcindex = con.funcindex;
+  }
 
 let context_gen = 
   Gen.(func_type_list_gen2 >>= fun funcs ->
@@ -127,7 +171,12 @@ let context_gen =
       return {
         labels = [];
         locals = [];
-        globals = [];
+        globals = {
+          i32 = [];
+          i64 = [];
+          f32 = [];
+          f64 = [];
+        };
         funcs = ([], None)::([], Some (Types.I32Type))::funcs;
         imports = [([Types.I32Type], None)];
         mems = mems;
@@ -163,7 +212,8 @@ let context_with_ftype con funcindex =
       con'
 
 let module_gen = Gen.(context_gen >>= fun context -> 
-  globals_gen context >>= fun con ->
+  globals_gen context >>= fun gltypelist ->
+    let con = process_globals context gltypelist in
     (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
     let rec rec_func_gen res func_types index = match func_types with
       | e::rst -> let func_t = match snd e with
@@ -181,13 +231,13 @@ let module_gen = Gen.(context_gen >>= fun context ->
                   )
       | []     -> return res in
       rec_func_gen [] con.funcs 0 >>= fun funcs ->
-        return (as_phrase (get_module (func_type_list_to_type_phrase (([Types.I32Type], None)::con.funcs)) (List.rev funcs) con.mems con.globals))
+        return (as_phrase (get_module (func_type_list_to_type_phrase (([Types.I32Type], None)::con.funcs)) (List.rev funcs) con.mems (List.map triple_to_global gltypelist)))
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:10 
+  Test.make ~name:"Modules" ~count:1 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
@@ -197,8 +247,10 @@ let module_test =
   )
 ;;
 
+(* QCheck_runner.set_seed(457392187);; *)
+(* QCheck_runner.set_seed(416362809);; *)
+(* QCheck_runner.set_seed(393719003);; *)
 QCheck_runner.set_seed(294956219);;
-(*QCheck_runner.set_seed(294956219);;*)
 QCheck_runner.run_tests ~verbose:true [ module_test; ] ;;
 
 (*

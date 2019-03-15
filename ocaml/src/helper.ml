@@ -1,6 +1,13 @@
 open Wasm
 open QCheck
 
+type globals_ = {
+  i32: (int * Types.mutability) list;
+  i64: (int * Types.mutability) list;
+  f32: (int * Types.mutability) list;
+  f64: (int * Types.mutability) list;
+}
+
 type context_ = {
           (* (input, result) list *)
   (*labels: (Types.value_type option * Types.stack_type) list;*)
@@ -9,7 +16,7 @@ type context_ = {
   imports: (Types.stack_type * Types.value_type option) list;
   tables: (Types.value_type option * Types.stack_type) list;
   locals: Types.stack_type;
-  globals: Ast.global list;
+  globals: globals_;
   mems: Ast.memory list;
   return: Types.value_type option;
   funcindex: int;
@@ -43,7 +50,7 @@ let get_module types funcs memories globals = {
   Ast.exports = [
     as_phrase ({
       Ast.name = string_to_name "aexp";
-      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 1l));
+      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 2l));
     })
   ];
 }
@@ -74,24 +81,33 @@ let mToString = function
   | None   -> "None"
 
 (** get_global_indexes: a' -> a list -> int list **)
-let get_global_indexes a l m =
-  let rec get_index a' l' i = try
-    let (global: Ast.global) = (List.nth l' i) in
-    let check = function
-      Types.GlobalType (t', m') -> 
-        (match t' = a' with
-          | true  -> 
-            (match m with
-              | Some n -> 
-                if n = m'
-                then i::(get_index a' l' (i+1)) 
-                else get_index a' l' (i+1)
-              | None   -> i::(get_index a' l' (i+1)))
-          | false -> get_index a' l' (i+1)) in
-      check global.it.gtype
-      with Failure _ -> [] in
-    (*print_endline ((string_of_int (List.length l))^" "^(typeToString a)^" "^(mToString m));*)
-    get_index a l 0
+let get_global_indexes t (l: globals_) m =
+  match t with 
+    | Types.I32Type -> List.fold_left 
+      (fun l (i, m') -> 
+        (match m with
+          | Some n ->  
+            if n = m' then i::l else l 
+          | None   -> i::l)) [] l.i32
+    | Types.I64Type -> List.fold_left 
+      (fun l (i, m') -> 
+        (match m with
+          | Some n ->  
+            if n = m' then i::l else l 
+          | None   -> i::l)) [] l.i64
+    | Types.F32Type -> List.fold_left 
+      (fun l (i, m') -> 
+        (match m with
+          | Some n ->  
+            if n = m' then i::l else l 
+          | None   -> i::l)) [] l.f32
+    | Types.F64Type -> List.fold_left 
+      (fun l (i, m') -> 
+        (match m with
+          | Some n ->  
+            if n = m' then i::l else l 
+          | None   -> i::l)) [] l.f64
+
 
 (** get_random_element: 'a -> ('a * 'b) list -> 'b **)
 let get_random_element a l =
