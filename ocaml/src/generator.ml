@@ -43,7 +43,7 @@ let context = {
   };
   funcs = [];
   imports = [];
-  mems = [];
+  mems = None;
   return = None;
   tables = [];
   funcindex = 0;
@@ -54,16 +54,16 @@ let context = {
 let value_type_opt_gen = Gen.(
   frequency [ 
     1, return None; 
-    3, (oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> return (Some t)) 
+    3, (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t -> return (Some t)) 
   ] >>= fun t_opt -> return t_opt)
 ;;
 
 (** stack_type_gen : int -> value_type list **)
-let stack_type_gen n = Gen.(list_repeat n (oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> return t))
+let stack_type_gen n = Gen.(list_repeat n (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t -> return t))
 ;;
 
 (** func_type_gen : func_type **)
-let func_type_gen = Gen.(small_int >>= fun n -> 
+let func_type_gen = Gen.(int_bound 10 >>= fun n -> 
   pair (stack_type_gen n) (value_type_opt_gen) >>= fun t -> return t)
 ;;
 
@@ -84,12 +84,17 @@ let memory_gen = Gen.(
           Types.min = Int32.of_int min;
           Types.max = max_opt;
         } in
-        let memory = {
-          Ast.mtype = Types.MemoryType limits
-        } in
-        return [Helper.as_phrase memory])
+        return (Some limits))
   in
-  oneof [ mem_gen; (*return [];*) ])
+  oneof [ mem_gen; return None;])
+
+let to_ast_memory = function
+  | None   -> []
+  | Some l -> 
+    let memory = {
+      Ast.mtype = Types.MemoryType l
+    } in
+    [Helper.as_phrase memory]
 
 (* as_phrase ({ Ast.gtype= Types.GlobalType (Types.I32Type, Immutable); Ast.value = as_phrase [] }) *)
 let globals_gen con =
@@ -107,13 +112,15 @@ let globals_gen con =
           ))
       | []     -> return globals )
   in
-  Gen.( list (oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type]) >>= fun tlist ->
+  Gen.( list (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type]) >>= fun tlist ->
     let triples = [] in
     rec_glob_gen con triples tlist >>= fun globals -> return globals
   )
 
 let triple_to_global = function (t, m, inst) ->
-  (Helper.as_phrase ({ Ast.gtype = Types.GlobalType (t, m); Ast.value = as_phrase [inst] }))
+  (Helper.as_phrase ({ Ast.gtype = Types.GlobalType (Helper.to_wasm_value_type (t), m); Ast.value = as_phrase [inst] }))
+
+exception Type_not_expected of string;;
 
 let process_globals con gtypelist =
   let rec rec_glob_process globals glist index = 
@@ -121,34 +128,36 @@ let process_globals con gtypelist =
       | g::rst -> 
         let nglobals = function (t, m, inst) -> 
             (match t with
-              | Types.I32Type -> 
+              | Helper.I32Type -> 
                 {
                   i32 = globals.i32@[(index, m)];
                   i64 = globals.i64;
                   f32 = globals.f32;
                   f64 = globals.f64;
                 }
-              | Types.I64Type -> 
+              | Helper.I64Type -> 
                 {
                   i32 = globals.i32;
                   i64 = globals.i64@[(index, m)];
                   f32 = globals.f32;
                   f64 = globals.f64;
                 }
-              | Types.F32Type -> 
+              | Helper.F32Type -> 
                 {
                   i32 = globals.i32;
                   i64 = globals.i64;
                   f32 = globals.f32@[(index, m)];
                   f64 = globals.f64;
                 }
-              | Types.F64Type -> 
+              | Helper.F64Type -> 
                 {
                   i32 = globals.i32;
                   i64 = globals.i64;
                   f32 = globals.f32;
                   f64 = globals.f64@[(index, m)];
-                }) in
+                }
+              | Helper.IndexType -> raise (Type_not_expected "")
+              ) in
         rec_glob_process (nglobals g) rst (index + 1)
       | []     -> globals
   in
@@ -177,8 +186,8 @@ let context_gen =
           f32 = [];
           f64 = [];
         };
-        funcs = ([], None)::([], Some (Types.I32Type))::funcs;
-        imports = [([Types.I32Type], None)];
+        funcs = ([], None)::([], Some (Helper.I32Type))::funcs;
+        imports = [([Helper.I32Type], None)];
         mems = mems;
         return = None;
         tables = [];
@@ -188,9 +197,9 @@ let context_gen =
 
 let rec func_type_list_to_type_phrase func_type_list = match func_type_list with
   | e::rst -> let ot_opt = match (snd e) with
-    | Some t -> [t]
+    | Some t -> [Helper.to_wasm_value_type t]
     | None   -> [] in
-      (as_phrase (Types.FuncType (fst e, ot_opt)))::(func_type_list_to_type_phrase rst)
+      (as_phrase (Types.FuncType (Helper.to_stack_type (fst e), ot_opt)))::(func_type_list_to_type_phrase rst)
   | []     -> []
 
 let context_with_ftype con funcindex = 
@@ -225,19 +234,19 @@ let module_gen = Gen.(context_gen >>= fun context ->
                         | Some inst -> inst
                         | None      -> [] 
                       in
-                      let func = as_phrase (get_func (fst e) (as_phrase (Int32.of_int (index + 1))) (List.rev instrs)) in
+                      let func = as_phrase (get_func (Helper.to_stack_type (fst e)) (as_phrase (Int32.of_int (index + 1))) (List.rev instrs)) in
                         rec_func_gen (func::res) rst (index + 1)
                     )
                   )
       | []     -> return res in
       rec_func_gen [] con.funcs 0 >>= fun funcs ->
-        return (as_phrase (get_module (func_type_list_to_type_phrase (([Types.I32Type], None)::con.funcs)) (List.rev funcs) con.mems (List.map triple_to_global gltypelist)))
+        return (as_phrase (get_module (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) (List.rev funcs) (to_ast_memory con.mems) (List.map triple_to_global gltypelist)))
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1 
+  Test.make ~name:"Modules" ~count:10 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
@@ -247,10 +256,12 @@ let module_test =
   )
 ;;
 
+QCheck_runner.set_seed(182324116);;
+(* QCheck_runner.set_seed(15600868);; *)
 (* QCheck_runner.set_seed(457392187);; *)
 (* QCheck_runner.set_seed(416362809);; *)
 (* QCheck_runner.set_seed(393719003);; *)
-QCheck_runner.set_seed(294956219);;
+(* QCheck_runner.set_seed(294956219);; *)
 QCheck_runner.run_tests ~verbose:true [ module_test; ] ;;
 
 (*

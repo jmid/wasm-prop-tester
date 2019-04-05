@@ -8,19 +8,32 @@ type globals_ = {
   f64: (int * Types.mutability) list;
 }
 
+type value_type = I32Type | I64Type | F32Type | F64Type | IndexType
+
 type context_ = {
           (* (input, result) list *)
   (*labels: (Types.value_type option * Types.stack_type) list;*)
-  labels: (Types.value_type option * Types.value_type option) list;
-  funcs: (Types.stack_type * Types.value_type option) list;
-  imports: (Types.stack_type * Types.value_type option) list;
-  tables: (Types.value_type option * Types.stack_type) list;
-  locals: Types.stack_type;
+  labels: (value_type option * value_type option) list;
+  funcs: (value_type list * value_type option) list;
+  imports: (value_type list * value_type option) list;
+  tables: (value_type option * Types.stack_type) list;
+  locals: value_type list;
   globals: globals_;
-  mems: Ast.memory list;
-  return: Types.value_type option;
+  mems: Int32.t Types.limits option;
+  return: value_type option;
   funcindex: int;
 }
+
+let to_wasm_value_type = function
+  | I32Type   -> Types.I32Type
+  | I64Type   -> Types.I64Type
+  | F32Type   -> Types.F32Type
+  | F64Type   -> Types.F64Type
+  | IndexType -> Types.I32Type
+
+let rec to_stack_type = function
+  | []     -> []
+  | e::rst -> (to_wasm_value_type e)::(to_stack_type rst)
 
 let string_to_name s =
   let rec exp i l =
@@ -83,30 +96,31 @@ let mToString = function
 (** get_global_indexes: a' -> a list -> int list **)
 let get_global_indexes t (l: globals_) m =
   match t with 
-    | Types.I32Type -> List.fold_left 
+    | I32Type -> List.fold_left 
       (fun l (i, m') -> 
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
           | None   -> i::l)) [] l.i32
-    | Types.I64Type -> List.fold_left 
+    | I64Type -> List.fold_left 
       (fun l (i, m') -> 
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
           | None   -> i::l)) [] l.i64
-    | Types.F32Type -> List.fold_left 
+    | F32Type -> List.fold_left 
       (fun l (i, m') -> 
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
           | None   -> i::l)) [] l.f32
-    | Types.F64Type -> List.fold_left 
+    | F64Type -> List.fold_left 
       (fun l (i, m') -> 
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
           | None   -> i::l)) [] l.f64
+    | IndexType -> []
 
 
 (** get_random_element: 'a -> ('a * 'b) list -> 'b **)

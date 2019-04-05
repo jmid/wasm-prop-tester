@@ -84,7 +84,7 @@ and instr_rule con t_opt size =
       | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (*(1, call_gen con t_opt size);*)]
       | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
               (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); 
-              (1, call_gen con t_opt size); (*(11, store_gen con t_opt size);*)])
+              (1, call_gen con t_opt size); (11, store_gen con t_opt size);(*(11, store_gen con t_opt size);*)])
     | Some _ -> (match size with 
       | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
       | n -> [(1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
@@ -123,27 +123,34 @@ and generate_rule rules =
 (*** Const ***)
 (** const_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and const_gen con t_opt size = match t_opt with
-  | Some Types.I32Type -> Gen.( oneofl [ "0x7fffffff"; "0x80000000"; "0x80000001"; "0x3fffffff"; "0x01234567"; "0x8ff00ff0"; 
+  | Some Helper.I32Type -> Gen.( oneofl [ "0x7fffffff"; "0x80000000"; "0x80000001"; "0x3fffffff"; "0x01234567"; "0x8ff00ff0"; 
         "0x40000000"; "0xabcd9876"; "0xfe00dc00"; "0xb0c1d2e3"; "0x769abcdf"]
     >>= fun s -> frequency [
     11, return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_string s)))), []));
     2, (small_int  >>= fun i -> return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), []))) ])
-  | Some Types.I64Type -> Gen.( oneofl [ (*"0x7fffffffffffffff";*) "0x8000000000000000"; "0x3fffffff"; "0x0123456789abcdef"; "0x8ff00ff00ff00ff0";
+  | Some Helper.I64Type -> Gen.( oneofl [ (*"0x7fffffffffffffff";*) "0x8000000000000000"; "0x3fffffff"; "0x0123456789abcdef"; "0x8ff00ff00ff00ff0";
         "0xf0f0ffff"; "0x4000000000000000"; "0xabcd1234ef567809"; "0xabd1234ef567809c"; "0xabcd987602468ace"; "0xfe000000dc000000"; "0x00008000"; 
         "0x00010000"; "0xAAAAAAAA55555555"; "0x99999999AAAAAAAA"; "0xDEADBEEFDEADBEEF"]
     >>= fun s -> frequency [ 
     16, return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_string s)))), []));
     2, (int >>= fun i -> return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I64 (Int64.of_int i)))), []))) ])
-  | Some Types.F32Type -> Gen.( oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126"; "-0x1p-126"; 
+  | Some Helper.F32Type -> Gen.( oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126"; "-0x1p-126"; 
         "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127"; "-0x1.fffffep+127"]
     >>= fun s -> frequency [
     12, return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_string s)))), []));
     2, (float >>= fun i -> return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F32 (F32.of_float i)))), []))) ])
-  | Some Types.F64Type -> Gen.( oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1"; "-0x1p-1"; 
+  | Some Helper.F64Type -> Gen.( oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1"; "-0x1p-1"; 
         "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022"; "0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2"; "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"]
     >>= fun s -> frequency [
     14, return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_string s)))), []));
     2, (float      >>= fun i -> return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.F64 (F64.of_float i)))), [])))   ])
+  | Some Helper.IndexType -> (match con.mems with
+    | Some mem -> let min = (Int32.to_int mem.min) in
+      if min = 0 
+      then Gen.return None
+      else Gen.( int_bound ((min * 65536) - 8) >>= fun i ->
+        return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), [])))
+    | None     -> Gen.return None)
   | None               -> Gen.return None
 
 (*** Unary operations ***)
@@ -157,11 +164,11 @@ and floatOp_unop_gen = Gen.oneofl
 
 (** unop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and unop_gen con t_opt size = match t_opt with
-  | Some Types.I32Type -> Gen.(intOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.I32 op)), [Types.I32Type;])))
-  | Some Types.I64Type -> Gen.(intOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.I64 op)), [Types.I64Type;])))
-  | Some Types.F32Type -> Gen.(floatOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.F32 op)), [Types.F32Type;])))
-  | Some Types.F64Type -> Gen.(floatOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.F64 op)), [Types.F64Type;])))
-  | None -> Gen.return None
+  | Some Helper.I32Type -> Gen.(intOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.I32 op)), [Helper.I32Type;])))
+  | Some Helper.I64Type -> Gen.(intOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.I64 op)), [Helper.I64Type;])))
+  | Some Helper.F32Type -> Gen.(floatOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.F32 op)), [Helper.F32Type;])))
+  | Some Helper.F64Type -> Gen.(floatOp_unop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Unary (Values.F64 op)), [Helper.F64Type;])))
+  | Some _ | None -> Gen.return None
 
 (*** Binary operations ***)
 (** intOp_binop_gen : IntOp.binop Gen.t **)
@@ -175,17 +182,17 @@ and floatOp_binop_gen = Gen.oneofl
 
 (** binop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and binop_gen con t_opt size = match t_opt with
-  | Some Types.I32Type -> Gen.(intOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.I32 op)), [Types.I32Type; Types.I32Type])))
-  | Some Types.I64Type -> Gen.(intOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.I64 op)), [Types.I64Type; Types.I64Type])))
-  | Some Types.F32Type -> Gen.(floatOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.F32 op)), [Types.F32Type; Types.F32Type])))
-  | Some Types.F64Type -> Gen.(floatOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.F64 op)), [Types.F64Type; Types.F64Type])))
-  | None -> Gen.return None
+  | Some Helper.I32Type -> Gen.(intOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.I32 op)), [Helper.I32Type; Helper.I32Type])))
+  | Some Helper.I64Type -> Gen.(intOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.I64 op)), [Helper.I64Type; Helper.I64Type])))
+  | Some Helper.F32Type -> Gen.(floatOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.F32 op)), [Helper.F32Type; Helper.F32Type])))
+  | Some Helper.F64Type -> Gen.(floatOp_binop_gen >>= fun op -> return (Some (con, Helper.as_phrase (Ast.Binary (Values.F64 op)), [Helper.F64Type; Helper.F64Type])))
+  | Some _ | None -> Gen.return None
 
 (*** Test operations ***)
 (** testop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and testop_gen con t_opt size = match t_opt with
-  | Some Types.I32Type -> Gen.( oneof [ return (Some (con, Helper.as_phrase (Ast.Test (Values.I32 Ast.IntOp.Eqz)), [Types.I32Type;]));
-                                        return (Some (con, Helper.as_phrase (Ast.Test (Values.I64 Ast.IntOp.Eqz)), [Types.I64Type;])); ] )
+  | Some Helper.I32Type -> Gen.( oneof [ return (Some (con, Helper.as_phrase (Ast.Test (Values.I32 Ast.IntOp.Eqz)), [Helper.I32Type;]));
+                                        return (Some (con, Helper.as_phrase (Ast.Test (Values.I64 Ast.IntOp.Eqz)), [Helper.I64Type;])); ] )
   | Some _ | None -> Gen.return None
 
 (*** Compare operations ***)
@@ -199,58 +206,58 @@ and floatOp_relop_gen = Gen.oneofl
 
 (** relop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and relop_gen con t_opt size = match t_opt with
-  | Some Types.I32Type -> Gen.(oneof [ 
-    (intOp_relop_gen >>= fun op -> oneofl [ (Some (con, Helper.as_phrase (Ast.Compare (Values.I32 op)), [Types.I32Type; Types.I32Type])); 
-                                            (Some (con, Helper.as_phrase (Ast.Compare (Values.I64 op)), [Types.I64Type; Types.I64Type])) ]);
-    (floatOp_relop_gen >>= fun op -> oneofl [ (Some (con, Helper.as_phrase (Ast.Compare (Values.F32 op)), [Types.F32Type; Types.F32Type]));
-                                              (Some (con, Helper.as_phrase (Ast.Compare (Values.F64 op)), [Types.F64Type; Types.F64Type])) ]); ])
+  | Some Helper.I32Type -> Gen.(oneof [ 
+    (intOp_relop_gen >>= fun op -> oneofl [ (Some (con, Helper.as_phrase (Ast.Compare (Values.I32 op)), [Helper.I32Type; Helper.I32Type])); 
+                                            (Some (con, Helper.as_phrase (Ast.Compare (Values.I64 op)), [Helper.I64Type; Helper.I64Type])) ]);
+    (floatOp_relop_gen >>= fun op -> oneofl [ (Some (con, Helper.as_phrase (Ast.Compare (Values.F32 op)), [Helper.F32Type; Helper.F32Type]));
+                                              (Some (con, Helper.as_phrase (Ast.Compare (Values.F64 op)), [Helper.F64Type; Helper.F64Type])) ]); ])
   | Some _ | None -> Gen.return None
 
 (*** Convert operations ***)
 (** int32Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and int32Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.WrapI64)), [Types.I64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF32)), [Types.F32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF32)), [Types.F32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF64)), [Types.F64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF64)), [Types.F64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.ReinterpretFloat)), [Types.F32Type])); ]
+  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.WrapI64)),   [Helper.I64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF32)), [Helper.F32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF32)), [Helper.F32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF64)), [Helper.F64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF64)), [Helper.F64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I32 Ast.IntOp.ReinterpretFloat)), [Helper.F32Type])); ]
 
 (** int64Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and int64Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendSI32)), [Types.I32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendUI32)), [Types.I32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF32)), [Types.F32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF32)), [Types.F32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF64)), [Types.F64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF64)), [Types.F64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ReinterpretFloat)), [Types.F64Type])); ]
+  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendSI32)), [Helper.I32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendUI32)), [Helper.I32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF32)),  [Helper.F32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF32)),  [Helper.F32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF64)),  [Helper.F64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF64)),  [Helper.F64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ReinterpretFloat)), [Helper.F64Type])); ]
 
 (** float32Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and float32Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI32)), [Types.I32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI32)), [Types.I32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI64)), [Types.I64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI64)), [Types.I64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.DemoteF64)), [Types.F64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [Types.I32Type])); ]
+  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI32)), [Helper.I32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI32)), [Helper.I32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI64)), [Helper.I64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI64)), [Helper.I64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.DemoteF64)), [Helper.F64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [Helper.I32Type])); ]
 
 (** float64Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and float64Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI32)), [Types.I32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI32)), [Types.I32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI64)), [Types.I64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI64)), [Types.I64Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.PromoteF32)), [Types.F32Type]));
-    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ReinterpretInt)), [Types.I64Type])); ]
+  [ (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI32)), [Helper.I32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI32)), [Helper.I32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI64)), [Helper.I64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI64)), [Helper.I64Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.PromoteF32)), [Helper.F32Type]));
+    (Some (con, Helper.as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ReinterpretInt)), [Helper.I64Type])); ]
 
 (** cvtop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and cvtop_gen con t_opt size = match t_opt with
-  | Some Types.I32Type -> int32Op_cvtop_gen con
-  | Some Types.I64Type -> int64Op_cvtop_gen con
-  | Some Types.F32Type -> float32Op_cvtop_gen con
-  | Some Types.F64Type -> float64Op_cvtop_gen con
-  | None -> Gen.return None
+  | Some Helper.I32Type -> int32Op_cvtop_gen con
+  | Some Helper.I64Type -> int64Op_cvtop_gen con
+  | Some Helper.F32Type -> float32Op_cvtop_gen con
+  | Some Helper.F64Type -> float64Op_cvtop_gen con
+  | Some _ | None -> Gen.return None
 
 
 (**** Parametric Instructions ****)
@@ -259,12 +266,12 @@ and cvtop_gen con t_opt size = match t_opt with
 (** drop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and drop_gen con t_opt size = match t_opt with
 | Some _ -> Gen.return None
-| None   -> Gen.(oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> return (Some (con, Helper.as_phrase (Ast.Drop), [t])))
+| None   -> Gen.(oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t -> return (Some (con, Helper.as_phrase (Ast.Drop), [t])))
 
 (*** Select ***)
 (** select_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and select_gen con t_opt size = match t_opt with
-  | Some t -> Gen.(return (Some (con, Helper.as_phrase (Ast.Select), [Types.I32Type; t; t])))
+  | Some t -> Gen.(return (Some (con, Helper.as_phrase (Ast.Select), [Helper.I32Type; t; t])))
   | None   -> Gen.return None
 
 (**** Variable Instructions ****)
@@ -311,7 +318,7 @@ and getGlobal_gen (con: context_) t_opt size = match t_opt with
 (** setGlobal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and setGlobal_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
-  | None -> Gen.( oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t -> 
+  | None -> Gen.( oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t -> 
               (let globals = Helper.get_global_indexes t con.globals (Some Types.Mutable) in
                 match globals with
                   | e::es -> Gen.( oneofl globals >>= fun i -> return (Some (con, Helper.as_phrase (Ast.SetGlobal (Helper.as_phrase (Int32.of_int i))), [t])) )
@@ -329,19 +336,19 @@ and align_load_gen t p_opt =
 (*** Load ***)
 (** load_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and load_gen con t_opt size = match t_opt with
-  | Some t -> Gen.(oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type] >>= fun t ->
+  | Some t -> Gen.(oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t ->
     frequency [ 
       1, return None; 
       3, pair (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32]) (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) -> return (Some (p, sx)) 
     ] >>= fun p_opt ->
-      pair (align_load_gen t p_opt) (ui32)  >>= fun (align, offset) ->
+      pair (align_load_gen (Helper.to_wasm_value_type t) p_opt) (ui32)  >>= fun (align, offset) ->
         let mop = {
-          Ast.ty = t; 
+          Ast.ty = Helper.to_wasm_value_type t; 
           Ast.align = align; 
           Ast.offset = offset; 
           Ast.sz = p_opt
         } in
-        return (Some (con, Helper.as_phrase (Ast.Load mop), [Types.I32Type; t])))
+        return (Some (con, Helper.as_phrase (Ast.Load mop), [t; Helper.I32Type;])))
   | None   -> Gen.return None
 
 (** align_store_gen **)
@@ -354,34 +361,39 @@ and align_store_gen t p_opt =
 
 (*** Store ***)
 (** store_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and store_gen con t_opt size = match t_opt with
-  | Some _ -> Gen.return None
-  | None   -> Gen.(oneofl [Types.I32Type; (*Types.I64Type; Types.F32Type; Types.F64Type;*)] >>= fun t ->
-    frequency [ 1, return None; 3, (oneofl [Memory.Pack8; Memory.Pack16; (*Memory.Pack32;*)] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
-      pair (align_store_gen t p_opt) (ui32) >>= fun (align, offset) ->
-        let mop = {
-          Ast.ty = t; 
-          Ast.align = 0; 
-          Ast.offset = 0l; 
-          Ast.sz = p_opt
-        } in
-        return (Some (con, Helper.as_phrase (Ast.Store mop), [t; Types.I32Type ])))
+and store_gen con t_opt size = match con.mems with
+  | None   -> Gen.return None
+  | Some m -> (match t_opt with
+    | Some _ -> Gen.return None
+    | None   -> 
+      if (Int32.to_int m.min) < 1
+      then Gen.return None
+      else Gen.(oneofl [Helper.I32Type; Helper.I64Type; (*Helper.F32Type; Helper.F64Type;*)] >>= fun t ->
+        frequency [ 1, return None; 3, (oneofl [Memory.Pack8; Memory.Pack16; (*Memory.Pack32;*)] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
+          pair (align_store_gen (Helper.to_wasm_value_type t) p_opt) (ui32) >>= fun (align, offset) ->
+            let mop = {
+              Ast.ty = Helper.to_wasm_value_type t; 
+              Ast.align = 0; 
+              Ast.offset = 0l; 
+              Ast.sz = p_opt
+            } in
+            return (Some (con, Helper.as_phrase (Ast.Store mop), [t; Helper.IndexType;]))))
     
 
 (*** MemorySize ***)
 (** memorysize_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and memorysize_gen con t_opt size = match t_opt with
-  | Some Types.I32Type  -> (match con.mems with
-    | [] -> Gen.return None
-    | _  -> Gen.return (Some (con, Helper.as_phrase (Ast.MemorySize), [])))
+  | Some Helper.I32Type  -> (match con.mems with
+    | None -> Gen.return None
+    | Some _  -> Gen.return (Some (con, Helper.as_phrase (Ast.MemorySize), [])))
   | Some _ | None       -> Gen.return None
 
 (*** MemoryGrow ***)
 (** memorygrow_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and memorygrow_gen con t_opt size = match t_opt with
-  | Some Types.I32Type  -> (match con.mems with
-    | [] -> Gen.return None
-    | _  -> Gen.return (Some (con, Helper.as_phrase (Ast.MemoryGrow), [Types.I32Type])))
+  | Some Helper.I32Type  -> (match con.mems with
+    | None -> Gen.return None
+    | Some _  -> Gen.return (Some (con, Helper.as_phrase (Ast.MemoryGrow), [Helper.I32Type])))
   | Some _ | None       -> Gen.return None
 
 (**** Control Instructions ****)
@@ -407,8 +419,8 @@ and block_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (t_opt, t_opt) con) [] ot size >>= 
     fun instrs_opt -> match instrs_opt with
-      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (ot, (List.rev instrs))), []))
-      | None        -> return (Some (con, Helper.as_phrase (Ast.Block (ot, [])), [])) )
+      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (Helper.to_stack_type ot, (List.rev instrs))), []))
+      | None        -> return (Some (con, Helper.as_phrase (Ast.Block (Helper.to_stack_type ot, [])), [])) )
 
 (*** Loop ***)
 (** loop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -419,8 +431,8 @@ and loop_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (None, t_opt) con) [] ot size >>= 
     fun instrs_opt -> match instrs_opt with
-      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (ot, (List.rev instrs))), []))
-      | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (ot, [])), [])) )
+      | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (Helper.to_stack_type ot, (List.rev instrs))), []))
+      | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (Helper.to_stack_type ot, [])), [])) )
 
 (*** If ***)
 (** if_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -429,8 +441,8 @@ and if_gen (con: context_) t_opt size =
     | Some t -> [t]
     | None   -> []
   in
-  Gen.( pair (instrs_rule (addLabel ((Some Types.I32Type), t_opt) con) [] ot (size/2)) 
-             (instrs_rule (addLabel ((Some Types.I32Type), t_opt) con) [] ot (size/2)) >>= 
+  Gen.( pair (instrs_rule (addLabel ((Some Helper.I32Type), t_opt) con) [] ot (size/2)) 
+             (instrs_rule (addLabel ((Some Helper.I32Type), t_opt) con) [] ot (size/2)) >>= 
       fun (instrs_opt1, instrs_opt2) -> 
         let instrs1 = match instrs_opt1 with
           | Some instrs -> instrs
@@ -438,7 +450,7 @@ and if_gen (con: context_) t_opt size =
         and instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some (con, Helper.as_phrase (Ast.If (ot, (List.rev instrs1), (List.rev instrs2))), [Types.I32Type])) )
+        return (Some (con, Helper.as_phrase (Ast.If (Helper.to_stack_type ot, (List.rev instrs1), (List.rev instrs2))), [Helper.I32Type])) )
 
 (*** Br ***)
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -462,7 +474,7 @@ and brif_gen (con: context_) t_opt size =
           | Some t -> [t]
           | None   -> []
         in
-        return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Types.I32Type::it)) )
+        return (Some (con, Helper.as_phrase (Ast.BrIf (Helper.as_phrase (Int32.of_int i))), Helper.I32Type::it)) )
       | []    -> Gen.return None
 
 (*** BrTable ***)
@@ -476,7 +488,7 @@ and brtable_gen (con: context_) t_opt size =
           | None   -> []
         in    
         list (oneofl labels >>= fun (i',it_opt') -> return (Helper.as_phrase (Int32.of_int i'))) >>= fun ilist ->
-          return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Types.I32Type::it)) )
+          return (Some (con, Helper.as_phrase (Ast.BrTable (ilist, (Helper.as_phrase (Int32.of_int i)))), Helper.I32Type::it)) )
       | []    -> Gen.return None
 
 (*** Return ***) 
