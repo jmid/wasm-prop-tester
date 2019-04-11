@@ -44,7 +44,7 @@ let string_to_name s =
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
 
-let get_module types funcs memories globals = {
+let get_module types funcs memories globals data = {
   Ast.types = types;
   Ast.globals = globals;
   Ast.tables = [];
@@ -52,7 +52,7 @@ let get_module types funcs memories globals = {
   Ast.funcs = funcs;
   Ast.start = Some (as_phrase 1l);
   Ast.elems  = [];
-  Ast.data = [];
+  Ast.data = data;
   Ast.imports = [
     as_phrase({
       Ast.module_name = string_to_name "imports";

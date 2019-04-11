@@ -96,6 +96,53 @@ let to_ast_memory = function
     } in
     [Helper.as_phrase memory]
 
+(* 
+let rec ds_to_list l sol i = match sol with
+  | (s, o)::rst -> 
+    let ds = Helper.as_phrase ({
+      Ast.index = as_phrase (Int32.of_int i);
+      Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int o)))) ];
+      Ast.init = s;
+    }) in
+    ds_to_list (ds::l) rst (i + 1)
+  | []     -> l
+
+let data_segments_gen = function
+  | None   -> Gen.return []
+  | Some (l: (Int32.t Types.limits)) -> 
+    let min = (Int32.to_int l.min) in
+    if min > 0
+    then Gen.(
+      oneofl [ Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type ] >>= fun t ->
+        let size = Types.size t in
+          list_size (int_bound min) (pair string (int_bound ((min * 65536) - size))) >>= fun sol ->
+            return (List.rev (ds_to_list [] sol 0))
+    )
+    else Gen.return []
+*)
+
+let data_segment_gen n = Gen.(
+  oneofl [ Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type ] >>= fun t ->
+    let size = Types.size t in
+    pair string (int_bound (n - size)) >>= fun (s, i) ->
+      return (Helper.as_phrase ({
+          Ast.index = as_phrase (Int32.of_int 0);
+          Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))) ];
+          Ast.init = s;
+        }))
+)
+
+let data_segments_gen = function
+  | None   -> Gen.return []
+  | Some (l: (Int32.t Types.limits)) -> 
+    let min = (Int32.to_int l.min) in
+    if min > 0
+    then Gen.(
+      list_size (int_bound min) (data_segment_gen (min * 65536)) >>= fun dl ->
+        return dl
+    )
+    else Gen.return []
+
 (* as_phrase ({ Ast.gtype= Types.GlobalType (Types.I32Type, Immutable); Ast.value = as_phrase [] }) *)
 let globals_gen con =
   let rec rec_glob_gen con' globals glist = 
@@ -240,13 +287,20 @@ let module_gen = Gen.(context_gen >>= fun context ->
                   )
       | []     -> return res in
       rec_func_gen [] con.funcs 0 >>= fun funcs ->
-        return (as_phrase (get_module (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) (List.rev funcs) (to_ast_memory con.mems) (List.map triple_to_global gltypelist)))
+        data_segments_gen con.mems >>= fun ds ->
+          return (as_phrase 
+            (get_module 
+              (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) 
+              (List.rev funcs) 
+              (to_ast_memory con.mems) 
+              (List.map triple_to_global gltypelist)
+              ds))
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:10 
+  Test.make ~name:"Modules" ~count:1 
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
@@ -256,7 +310,8 @@ let module_test =
   )
 ;;
 
-QCheck_runner.set_seed(182324116);;
+QCheck_runner.set_seed(196716697);;
+(* QCheck_runner.set_seed(182324116);; *)
 (* QCheck_runner.set_seed(15600868);; *)
 (* QCheck_runner.set_seed(457392187);; *)
 (* QCheck_runner.set_seed(416362809);; *)

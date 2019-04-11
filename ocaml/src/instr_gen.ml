@@ -335,21 +335,23 @@ and align_load_gen t p_opt =
 
 (*** Load ***)
 (** load_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and load_gen con t_opt size = match t_opt with
-  | Some t -> Gen.(oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t ->
-    frequency [ 
-      1, return None; 
-      3, pair (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32]) (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) -> return (Some (p, sx)) 
-    ] >>= fun p_opt ->
-      pair (align_load_gen (Helper.to_wasm_value_type t) p_opt) (ui32)  >>= fun (align, offset) ->
-        let mop = {
-          Ast.ty = Helper.to_wasm_value_type t; 
-          Ast.align = align; 
-          Ast.offset = offset; 
-          Ast.sz = p_opt
-        } in
-        return (Some (con, Helper.as_phrase (Ast.Load mop), [t; Helper.I32Type;])))
+and load_gen con t_opt size = match con.mems with
   | None   -> Gen.return None
+  | Some m -> (match t_opt with
+    | Some t -> Gen.(oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t ->
+      frequency [ 
+        1, return None; 
+        3, pair (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32]) (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) -> return (Some (p, sx)) 
+      ] >>= fun p_opt ->
+        pair (align_load_gen (Helper.to_wasm_value_type t) p_opt) (ui32)  >>= fun (align, offset) ->
+          let mop = {
+            Ast.ty = Helper.to_wasm_value_type t; 
+            Ast.align = align; 
+            Ast.offset = offset; 
+            Ast.sz = p_opt
+          } in
+          return (Some (con, Helper.as_phrase (Ast.Load mop), [t; Helper.I32Type;])))
+    | None   -> Gen.return None)
 
 (** align_store_gen **)
 and align_store_gen t p_opt = 
