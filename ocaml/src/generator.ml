@@ -76,9 +76,9 @@ let func_type_list_gen2 = Gen.(list_size (int_bound 2) func_type_gen)
 ;;
 
 (** limits_gen : limits list **)
-let limits_gen = Gen.( 
+let limits_gen max_size = Gen.( 
   let limit_gen = (small_int >>= fun min -> 
-    int_range min 65536 >>= fun max ->
+    int_range min max_size >>= fun max ->
       oneofl [ Some (Int32.of_int max); None; ] >>= fun max_opt ->
         let limits = {
           Types.min = Int32.of_int min;
@@ -148,6 +148,27 @@ let data_segment_list_gen = function
     then Gen.(
       list_size (int_bound min) (data_segment_gen (min * 65536)) >>= fun dl ->
         return dl
+    )
+    else Gen.return []
+
+let elem_segment_gen n m = Gen.(
+  pair (int_bound n) (list (int_bound m)) >>= fun (o, il) ->
+    let init = List.map (fun i -> as_phrase (Int32.of_int i)) il in  
+      return (as_phrase ({
+        Ast.index = as_phrase (Int32.of_int 0);
+        Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int o)))) ];
+        Ast.init = init;
+      }))
+)
+
+let elem_segment_list_gen m = function
+  | None   -> Gen.return []
+  | Some (l: (Int32.t Types.limits)) -> 
+    let min = (Int32.to_int l.min) in
+    if min > 0
+    then Gen.(
+      list_size (int_bound min) (elem_segment_gen (min * 65536) m ) >>= fun el ->
+        return el
     )
     else Gen.return []
 
@@ -231,7 +252,7 @@ let process_globals con gtypelist =
 
 let context_gen = 
   Gen.(func_type_list_gen2 >>= fun funcs ->
-    pair limits_gen limits_gen >>= fun (mems, tables) ->
+    pair (limits_gen (int_of_float (2.0 ** 16.0))) (limits_gen (int_of_float (2.0 ** 32.0))) >>= fun (mems, tables) ->
       return {
         labels = [];
         locals = [];
@@ -296,14 +317,16 @@ let module_gen = Gen.(context_gen >>= fun context ->
       | []     -> return res in
       rec_func_gen [] con.funcs 0 >>= fun funcs ->
         data_segment_list_gen con.mems >>= fun ds ->
-          return (as_phrase 
-            (get_module 
-              (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) 
-              (List.rev funcs) 
-              (limits_to_ast_memory con.mems) 
-              (List.map triple_to_global gltypelist)
-              ds
-              (limits_to_ast_table con.tables)))
+          elem_segment_list_gen (List.length funcs) con.tables >>= fun es ->
+            return (as_phrase 
+              (get_module 
+                (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) 
+                (List.rev funcs) 
+                (limits_to_ast_memory con.mems) 
+                (List.map triple_to_global gltypelist)
+                ds
+                (limits_to_ast_table con.tables)
+                es))
   )
 
 let arb_module = make module_gen

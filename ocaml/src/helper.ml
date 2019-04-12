@@ -45,14 +45,20 @@ let string_to_name s =
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
 
-let get_module types funcs memories globals data tables = {
+(* (Helper.as_phrase ({
+          Ast.index = as_phrase (Int32.of_int 0);
+          Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))) ];
+          Ast.init = s;
+        })) *)
+
+let get_module types funcs memories globals data tables elems = {
   Ast.types = types;
   Ast.globals = globals;
   Ast.tables = tables;
   Ast.memories = memories;
   Ast.funcs = funcs;
-  Ast.start = Some (as_phrase 1l);
-  Ast.elems  = [];
+  Ast.start = None(*None*)(*Some (as_phrase 1l)*);
+  Ast.elems  = elems;
   Ast.data = data;
   Ast.imports = [
     as_phrase({
