@@ -45,7 +45,7 @@ let context = {
   imports = [];
   mems = None;
   return = None;
-  tables = [];
+  tables = None;
   funcindex = 0;
 }
 ;;
@@ -75,9 +75,9 @@ let func_type_list_gen = Gen.(list_size small_nat func_type_gen)
 let func_type_list_gen2 = Gen.(list_size (int_bound 2) func_type_gen)
 ;;
 
-(** memory_gen : memory list **)
-let memory_gen = Gen.( 
-  let mem_gen = (small_int >>= fun min -> 
+(** limits_gen : limits list **)
+let limits_gen = Gen.( 
+  let limit_gen = (small_int >>= fun min -> 
     int_range min 65536 >>= fun max ->
       oneofl [ Some (Int32.of_int max); None; ] >>= fun max_opt ->
         let limits = {
@@ -86,15 +86,23 @@ let memory_gen = Gen.(
         } in
         return (Some limits))
   in
-  oneof [ mem_gen; return None;])
+  oneof [ limit_gen; return None;])
 
-let to_ast_memory = function
+let limits_to_ast_memory = function
   | None   -> []
   | Some l -> 
     let memory = {
       Ast.mtype = Types.MemoryType l
     } in
     [Helper.as_phrase memory]
+
+let limits_to_ast_table = function
+  | None   -> []
+  | Some l -> 
+    let table = {
+      Ast.ttype = Types.TableType (l, Types.AnyFuncType)
+    } in
+    [Helper.as_phrase table]
 
 (* 
 let rec ds_to_list l sol i = match sol with
@@ -132,7 +140,7 @@ let data_segment_gen n = Gen.(
         }))
 )
 
-let data_segments_gen = function
+let data_segment_list_gen = function
   | None   -> Gen.return []
   | Some (l: (Int32.t Types.limits)) -> 
     let min = (Int32.to_int l.min) in
@@ -223,7 +231,7 @@ let process_globals con gtypelist =
 
 let context_gen = 
   Gen.(func_type_list_gen2 >>= fun funcs ->
-    memory_gen >>= fun mems ->
+    pair limits_gen limits_gen >>= fun (mems, tables) ->
       return {
         labels = [];
         locals = [];
@@ -237,7 +245,7 @@ let context_gen =
         imports = [([Helper.I32Type], None)];
         mems = mems;
         return = None;
-        tables = [];
+        tables = tables;
         funcindex = 0;
       }
   )
@@ -287,14 +295,15 @@ let module_gen = Gen.(context_gen >>= fun context ->
                   )
       | []     -> return res in
       rec_func_gen [] con.funcs 0 >>= fun funcs ->
-        data_segments_gen con.mems >>= fun ds ->
+        data_segment_list_gen con.mems >>= fun ds ->
           return (as_phrase 
             (get_module 
               (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) 
               (List.rev funcs) 
-              (to_ast_memory con.mems) 
+              (limits_to_ast_memory con.mems) 
               (List.map triple_to_global gltypelist)
-              ds))
+              ds
+              (limits_to_ast_table con.tables)))
   )
 
 let arb_module = make module_gen

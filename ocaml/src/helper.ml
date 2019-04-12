@@ -16,7 +16,8 @@ type context_ = {
   labels: (value_type option * value_type option) list;
   funcs: (value_type list * value_type option) list;
   imports: (value_type list * value_type option) list;
-  tables: (value_type option * Types.stack_type) list;
+  (* tables: (value_type option * Types.stack_type) list; *)
+  tables: Int32.t Types.limits option;
   locals: value_type list;
   globals: globals_;
   mems: Int32.t Types.limits option;
@@ -44,10 +45,10 @@ let string_to_name s =
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
 
-let get_module types funcs memories globals data = {
+let get_module types funcs memories globals data tables = {
   Ast.types = types;
   Ast.globals = globals;
-  Ast.tables = [];
+  Ast.tables = tables;
   Ast.memories = memories;
   Ast.funcs = funcs;
   Ast.start = Some (as_phrase 1l);
