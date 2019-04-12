@@ -17,10 +17,12 @@ type context_ = {
   funcs: (value_type list * value_type option) list;
   imports: (value_type list * value_type option) list;
   (* tables: (value_type option * Types.stack_type) list; *)
+  mems: Int32.t Types.limits option;
+  data: string Ast.segment list;
   tables: Int32.t Types.limits option;
+  elems: Ast.var list Ast.segment list;
   locals: value_type list;
   globals: globals_;
-  mems: Int32.t Types.limits option;
   return: value_type option;
   funcindex: int;
 }
@@ -44,12 +46,6 @@ let string_to_name s =
 
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
 ;;
-
-(* (Helper.as_phrase ({
-          Ast.index = as_phrase (Int32.of_int 0);
-          Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))) ];
-          Ast.init = s;
-        })) *)
 
 let get_module types funcs memories globals data tables elems = {
   Ast.types = types;

@@ -44,8 +44,10 @@ let context = {
   funcs = [];
   imports = [];
   mems = None;
+  data = [];
   return = None;
   tables = None;
+  elems = [];
   funcindex = 0;
 }
 ;;
@@ -245,8 +247,10 @@ let process_globals con gtypelist =
     funcs = con.funcs;
     imports = con.imports;
     mems = con.mems;
+    data = con.data;
     return = con.return;
     tables = con.tables;
+    elems = con.elems;
     funcindex = con.funcindex;
   }
 
@@ -265,8 +269,10 @@ let context_gen =
         funcs = ([], None)::([], Some (Helper.I32Type))::funcs;
         imports = [([Helper.I32Type], None)];
         mems = mems;
+        data = [];
         return = None;
         tables = tables;
+        elems = [];
         funcindex = 0;
       }
   )
@@ -285,48 +291,68 @@ let context_with_ftype con funcindex =
     in
       let con' = {
         labels = label;
-        locals = con.locals;
+        locals = fst ftype;
         globals = con.globals;
         funcs = con.funcs;
         imports = con.imports;
         mems = con.mems;
-        return = None;
+        data = con.data;
+        return = snd ftype;
         tables = con.tables;
+        elems = con.elems;
         funcindex = funcindex + 1;
       } in
       con'
 
-let module_gen = Gen.(context_gen >>= fun context -> 
-  globals_gen context >>= fun gltypelist ->
-    let con = process_globals context gltypelist in
-    (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
-    let rec rec_func_gen res func_types index = match func_types with
-      | e::rst -> let func_t = match snd e with
-                    | Some t -> [t]
-                    | None   -> []
+let extend_context con data elems = 
+  let con' = {
+    labels = con.labels;
+    locals = con.locals;
+    globals = con.globals;
+    funcs = con.funcs;
+    imports = con.imports;
+    mems = con.mems;
+    data = data;
+    return = None;
+    tables = con.tables;
+    elems = elems;
+    funcindex = con.funcindex;
+  } in
+  con'
+
+(* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
+let rec rec_func_gen con res func_types index = Gen.(match func_types with
+  | e::rst -> let func_t = match snd e with
+                | Some t -> [t]
+                | None   -> []
+              in
+              (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt -> 
+                (let instrs = match instrs_opt with
+                    | Some inst -> inst
+                    | None      -> [] 
                   in
-                  (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt -> 
-                    (let instrs = match instrs_opt with
-                        | Some inst -> inst
-                        | None      -> [] 
-                      in
-                      let func = as_phrase (get_func (Helper.to_stack_type (fst e)) (as_phrase (Int32.of_int (index + 1))) (List.rev instrs)) in
-                        rec_func_gen (func::res) rst (index + 1)
-                    )
-                  )
-      | []     -> return res in
-      rec_func_gen [] con.funcs 0 >>= fun funcs ->
-        data_segment_list_gen con.mems >>= fun ds ->
-          elem_segment_list_gen (List.length funcs) con.tables >>= fun es ->
-            return (as_phrase 
-              (get_module 
-                (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) 
-                (List.rev funcs) 
-                (limits_to_ast_memory con.mems) 
-                (List.map triple_to_global gltypelist)
-                ds
-                (limits_to_ast_table con.tables)
-                es))
+                  let func = as_phrase (get_func (Helper.to_stack_type (fst e)) (as_phrase (Int32.of_int (index + 1))) (List.rev instrs)) in
+                    rec_func_gen con (func::res) rst (index + 1)
+                )
+              )
+  | []     -> return res)
+
+let module_gen = Gen.(
+  context_gen >>= fun context -> 
+    globals_gen context >>= fun gltypelist ->
+      pair (data_segment_list_gen context.mems) (elem_segment_list_gen (List.length context.funcs) context.tables) >>= fun (ds,es) ->
+        let con' = extend_context context ds es in
+          let con = process_globals con' gltypelist in
+            rec_func_gen con [] con.funcs 0 >>= fun funcs ->        
+              return (as_phrase 
+                (get_module 
+                  (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) 
+                  (List.rev funcs) 
+                  (limits_to_ast_memory con.mems) 
+                  (List.map triple_to_global gltypelist)
+                  con.data
+                  (limits_to_ast_table con.tables)
+                  con.elems))
   )
 
 let arb_module = make module_gen
