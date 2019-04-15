@@ -53,7 +53,7 @@ let context = {
   data = [];
   return = None;
   tables = None;
-  elems = [];
+  elems = None;
   funcindex = 0;
 }
 ;;
@@ -222,13 +222,55 @@ let data_segment_list_gen = function
 let elem_segment_gen n m = Gen.(
   int_bound n >>= fun o ->
     list_size (int_bound (n - o)) (int_bound m) >>= fun il ->
-      let init = List.map (fun i -> as_phrase (Int32.of_int i)) il in
+      return (o, il)
+      (* let init = List.map (fun i -> as_phrase (Int32.of_int i)) il in
         return (as_phrase ({
           Ast.index = as_phrase (Int32.of_int 0);
           Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int o)))) ];
           Ast.init = init;
-        }))
+        })) *)
 )
+
+(* let elem_segment_list_gen (con: context_) flist = Gen.(
+  let elem_gen = (match con.tables with
+    | None   -> return None
+    | Some (l: (Int32.t Types.limits)) ->
+      let min = (Int32.to_int l.min) in 
+      if min > 0
+      then (
+        int_bound min >>= fun size ->
+          let elems' = Array.make size None in
+            return (Some elems')
+      )
+      else return None)
+  in elem_gen >>= fun elems ->
+  return
+  {
+    labels = con.labels;
+    locals = con.locals;
+    globals = con.globals;
+    funcs = con.funcs;
+    imports = con.imports;
+    mems = con.mems;
+    data = con.data;
+    return = con.return;
+    tables = con.tables;
+    elems = elems;
+    funcindex = con.funcindex;
+  }) *)
+
+let elems_to_ast_elems el = 
+  List.( map (
+    fun (o, il) -> 
+      let init = map (fun i -> as_phrase (Int32.of_int i)) il in
+        (as_phrase ({
+          Ast.index = as_phrase (Int32.of_int 0);
+          Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int o)))) ];
+          Ast.init = init;
+        }))
+      )
+    el
+  ) 
 
 let elem_segment_list_gen m = function
   | None   -> Gen.return []
@@ -239,7 +281,8 @@ let elem_segment_list_gen m = function
       list_size (int_bound min) (elem_segment_gen min m ) >>= fun el ->
         return el
     )
-    else Gen.return []
+  else Gen.return []
+
 
 (* as_phrase ({ Ast.gtype= Types.GlobalType (Types.I32Type, Immutable); Ast.value = as_phrase [] }) *)
 let globals_gen con =
@@ -346,7 +389,7 @@ let context_gen =
         data = [];
         return = None;
         tables = tables;
-        elems = [];
+        elems = None;
         funcindex = 0;
       }
   )
@@ -397,6 +440,37 @@ let get_ftype con funci =
     ) 
   )
 
+let process_elems (con: context_) el = 
+  let rec elem_array elems i = function
+    | []      -> elems
+    | e::rst  -> 
+      let ftype_opt = get_ftype con e in 
+      let elems' = match ftype_opt with 
+        | None        -> elems
+        | Some ftype  -> elems.(i) <- Some (snd ftype, i); elems in
+      elem_array elems' (i + 1) rst in
+  let rec set_up elems = function
+    | []      -> elems
+    | e::rst  -> set_up (elem_array elems (fst e) (snd e)) rst in
+  let size = ( match con.tables with
+      | None   -> 0
+      | Some (l: (Int32.t Types.limits)) -> Int32.to_int l.min
+    ) in
+  let elems = Array.make size None in
+  {
+    labels = con.labels;
+    locals = con.locals;
+    globals = con.globals;
+    funcs = con.funcs;
+    imports = con.imports;
+    mems = con.mems;
+    data = con.data;
+    return = con.return;
+    tables = con.tables;
+    elems = Some (set_up elems el);
+    funcindex = con.funcindex;
+  }
+
 let context_with_ftype con funcindex =
   (* let ftype = List.nth con.funcs funcindex *)
   let ftype = match get_ftype con funcindex with
@@ -420,7 +494,7 @@ let context_with_ftype con funcindex =
       } in
       con'
 
-let extend_context con data elems =
+let extend_context con data =
   let con' = {
     labels = con.labels;
     locals = con.locals;
@@ -431,7 +505,7 @@ let extend_context con data elems =
     data = data;
     return = None;
     tables = con.tables;
-    elems = elems;
+    elems = con.elems;
     funcindex = con.funcindex;
   } in
   con'
@@ -457,20 +531,22 @@ let module_gen = Gen.(
   context_gen >>= fun context ->
     globals_gen context >>= fun gltypelist ->
       func_type_list_gen2 >>= fun ftypelist ->
-        pair (data_segment_list_gen context.mems) (elem_segment_list_gen (List.length ftypelist) context.tables) >>= fun (ds,es) ->
-          let con = extend_context context ds es in
+        data_segment_list_gen context.mems >>= fun ds ->
+          let con = extend_context context ds in
             let con' = process_globals con gltypelist in
               let con'' = process_funcs con' ftypelist in 
-                rec_func_gen con'' [] (([], None)::([], Some (Helper.I32Type))::ftypelist) 0 >>= fun funcs ->
-                  return (as_phrase
-                    (get_module
-                      (func_type_list_to_type_phrase (([Helper.I32Type], None)::([], None)::([], Some (Helper.I32Type))::ftypelist))
-                      (List.rev funcs)
-                      (limits_to_ast_memory con''.mems)
-                      (List.map triple_to_global gltypelist)
-                      con''.data
-                      (limits_to_ast_table con''.tables)
-                      con''.elems))
+                elem_segment_list_gen (List.length (([Helper.I32Type], None)::([], None)::([], Some (Helper.I32Type))::ftypelist)) con''.tables >>= fun es ->
+                  let con''' = process_elems con'' es in               
+                    rec_func_gen con''' [] (([], None)::([], Some (Helper.I32Type))::ftypelist) 0 >>= fun funcs ->
+                      return (as_phrase
+                        (get_module
+                          (func_type_list_to_type_phrase (([Helper.I32Type], None)::([], None)::([], Some (Helper.I32Type))::ftypelist))
+                          (List.rev funcs)
+                          (limits_to_ast_memory con'''.mems)
+                          (List.map triple_to_global gltypelist)
+                          con'''.data
+                          (limits_to_ast_table con'''.tables)
+                          (elems_to_ast_elems es)))
   )
 
 let arb_module = make module_gen
@@ -486,7 +562,8 @@ let module_test =
   )
 ;;
 
-QCheck_runner.set_seed(196716697);;
+QCheck_runner.set_seed(265188083);;
+(* QCheck_runner.set_seed(196716697);; *)
 (* QCheck_runner.set_seed(182324116);; *)
 (* QCheck_runner.set_seed(15600868);; *)
 (* QCheck_runner.set_seed(457392187);; *)

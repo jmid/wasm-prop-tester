@@ -29,8 +29,8 @@ type context_ = {
   mems: Int32.t Types.limits option;
   data: string Ast.segment list;
   tables: Int32.t Types.limits option;
-  elems: Ast.var list Ast.segment list;
-  (* elems: int array; *)
+  (* elems: Ast.var list Ast.segment list; *)
+  elems: ((value_type option * int) option) array option;
   locals: value_type list;
   globals: globals_;
   return: value_type option;
