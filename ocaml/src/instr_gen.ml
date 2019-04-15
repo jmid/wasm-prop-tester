@@ -498,7 +498,7 @@ and brtable_gen (con: context_) t_opt size =
 (*** Return ***) 
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and return_gen (con: context_) t_opt size = 
-  let tlist = try match snd (List.nth (con.imports@con.funcs) con.funcindex) with
+  let tlist = try match con.return with
     | Some t -> [t]
     | None   -> []
   with Failure _ -> []
@@ -508,9 +508,20 @@ and return_gen (con: context_) t_opt size =
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and call_gen (con: context_) t_opt size = 
-  match Helper.get_random_global t_opt (con.imports@con.funcs) con.funcindex with
-   | Some (i,t) -> Gen.return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev t)))
-   | None       -> Gen.return None
+  let ilist = match t_opt with 
+    | None           -> con.funcs.f_none
+    | Some I32Type   -> con.funcs.f_i32
+    | Some I64Type   -> con.funcs.f_i64
+    | Some F32Type   -> con.funcs.f_f32
+    | Some F64Type   -> con.funcs.f_f64
+    | Some IndexType -> []
+  in
+  if List.length ilist < 1 
+  then Gen.return None
+  else Gen.(
+    oneofl ilist >>= fun (i, t) ->
+    return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev t)))
+  )
 
 (*
 (*** CallIndirect ***)

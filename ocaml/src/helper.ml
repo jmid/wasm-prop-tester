@@ -2,25 +2,35 @@ open Wasm
 open QCheck
 
 type globals_ = {
-  i32: (int * Types.mutability) list;
-  i64: (int * Types.mutability) list;
-  f32: (int * Types.mutability) list;
-  f64: (int * Types.mutability) list;
+  g_i32: (int * Types.mutability) list;
+  g_i64: (int * Types.mutability) list;
+  g_f32: (int * Types.mutability) list;
+  g_f64: (int * Types.mutability) list;
 }
 
 type value_type = I32Type | I64Type | F32Type | F64Type | IndexType
+
+type funcs_ = {
+  f_none: (int * value_type list) list;
+  f_i32:  (int * value_type list) list;
+  f_i64:  (int * value_type list) list;
+  f_f32:  (int * value_type list) list;
+  f_f64:  (int * value_type list) list;
+}
 
 type context_ = {
           (* (input, result) list *)
   (*labels: (Types.value_type option * Types.stack_type) list;*)
   labels: (value_type option * value_type option) list;
-  funcs: (value_type list * value_type option) list;
+  (* funcs: (value_type list * value_type option) list; *)
+  funcs: funcs_;
   imports: (value_type list * value_type option) list;
   (* tables: (value_type option * Types.stack_type) list; *)
   mems: Int32.t Types.limits option;
   data: string Ast.segment list;
   tables: Int32.t Types.limits option;
   elems: Ast.var list Ast.segment list;
+  (* elems: int array; *)
   locals: value_type list;
   globals: globals_;
   return: value_type option;
@@ -104,25 +114,25 @@ let get_global_indexes t (l: globals_) m =
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
-          | None   -> i::l)) [] l.i32
+          | None   -> i::l)) [] l.g_i32
     | I64Type -> List.fold_left 
       (fun l (i, m') -> 
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
-          | None   -> i::l)) [] l.i64
+          | None   -> i::l)) [] l.g_i64
     | F32Type -> List.fold_left 
       (fun l (i, m') -> 
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
-          | None   -> i::l)) [] l.f32
+          | None   -> i::l)) [] l.g_f32
     | F64Type -> List.fold_left 
       (fun l (i, m') -> 
         (match m with
           | Some n ->  
             if n = m' then i::l else l 
-          | None   -> i::l)) [] l.f64
+          | None   -> i::l)) [] l.g_f64
     | IndexType -> []
 
 

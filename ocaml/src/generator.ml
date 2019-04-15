@@ -18,7 +18,7 @@ let string_to_name s =
   exp (String.length s - 1) []
 ;;
 
-let get_func input ftype body = 
+let get_func input ftype body =
   {
     Ast.ftype = ftype;
     Ast.locals = input;
@@ -26,8 +26,8 @@ let get_func input ftype body =
   }
 ;;
 
-let wasm_to_file m = 
-  let oc = open_out file_name in 
+let wasm_to_file m =
+  let oc = open_out file_name in
     Sexpr.output oc 80 m;
     close_out oc
 ;;
@@ -36,12 +36,18 @@ let context = {
   labels = [];
   locals = [];
   globals = {
-    i32 = [];
-    i64 = [];
-    f32 = [];
-    f64 = [];
+    g_i32 = [];
+    g_i64 = [];
+    g_f32 = [];
+    g_f64 = [];
   };
-  funcs = [];
+  funcs = {
+    f_none = [];
+    f_i32 = [];
+    f_i64 = [];
+    f_f32 = [];
+    f_f64 = [];
+  };
   imports = [];
   mems = None;
   data = [];
@@ -54,9 +60,9 @@ let context = {
 
 (** value_type_opt_gen : value_type option **)
 let value_type_opt_gen = Gen.(
-  frequency [ 
-    1, return None; 
-    3, (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t -> return (Some t)) 
+  frequency [
+    1, return None;
+    3, (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t -> return (Some t))
   ] >>= fun t_opt -> return t_opt)
 ;;
 
@@ -65,7 +71,7 @@ let stack_type_gen n = Gen.(list_repeat n (oneofl [Helper.I32Type; Helper.I64Typ
 ;;
 
 (** func_type_gen : func_type **)
-let func_type_gen = Gen.(int_bound 10 >>= fun n -> 
+let func_type_gen = Gen.(int_bound 10 >>= fun n ->
   pair (stack_type_gen n) (value_type_opt_gen) >>= fun t -> return t)
 ;;
 
@@ -77,9 +83,69 @@ let func_type_list_gen = Gen.(list_size small_nat func_type_gen)
 let func_type_list_gen2 = Gen.(list_size (int_bound 2) func_type_gen)
 ;;
 
+let process_funcs con flist = 
+  let rec process_flist funcs i = function
+    | []      -> funcs
+    | e::rst  -> 
+      (let funcs' = (match snd e with 
+        | None    -> {
+            f_none = (i, fst e)::funcs.f_none;
+            f_i32  = funcs.f_i32;
+            f_i64  = funcs.f_i64;
+            f_f32  = funcs.f_f32;
+            f_f64  = funcs.f_f64;
+          }
+        | Some I32Type    -> {
+            f_none = funcs.f_none;
+            f_i32  = (i, fst e)::funcs.f_i32;
+            f_i64  = funcs.f_i64;
+            f_f32  = funcs.f_f32;
+            f_f64  = funcs.f_f64;
+          }
+        | Some I64Type    -> {
+            f_none = funcs.f_none;
+            f_i32  = funcs.f_i32;
+            f_i64  = (i, fst e)::funcs.f_i64;
+            f_f32  = funcs.f_f32;
+            f_f64  = funcs.f_f64;
+          }
+        | Some F32Type    -> {
+            f_none = funcs.f_none;
+            f_i32  = funcs.f_i32;
+            f_i64  = funcs.f_i64;
+            f_f32  = (i, fst e)::funcs.f_f32;
+            f_f64  = funcs.f_f64;
+          }
+        | Some F64Type    -> {
+            f_none = funcs.f_none;
+            f_i32  = funcs.f_i32;
+            f_i64  = funcs.f_i64;
+            f_f32  = funcs.f_f32;
+            f_f64  = (i, fst e)::funcs.f_f64;
+          }
+        | Some IndexType  -> 
+          funcs
+        ) in
+        process_flist funcs' (i+1) rst
+      ) in    
+      let funcs = process_flist con.funcs 2 flist in
+      {
+        labels = con.labels;
+        locals = con.locals;
+        globals = con.globals;
+        funcs = funcs;
+        imports = con.imports;
+        mems = con.mems;
+        data = con.data;
+        return = con.return;
+        tables = con.tables;
+        elems = con.elems;
+        funcindex = con.funcindex;
+      }
+
 (** limits_gen : limits list **)
-let limits_gen max_size = Gen.( 
-  let limit_gen = (small_int >>= fun min -> 
+let limits_gen max_size = Gen.(
+  let limit_gen = (small_int >>= fun min ->
     int_range min max_size >>= fun max ->
       oneofl [ Some (Int32.of_int max); None; ] >>= fun max_opt ->
         let limits = {
@@ -92,7 +158,7 @@ let limits_gen max_size = Gen.(
 
 let limits_to_ast_memory = function
   | None   -> []
-  | Some l -> 
+  | Some l ->
     let memory = {
       Ast.mtype = Types.MemoryType l
     } in
@@ -100,15 +166,15 @@ let limits_to_ast_memory = function
 
 let limits_to_ast_table = function
   | None   -> []
-  | Some l -> 
+  | Some l ->
     let table = {
       Ast.ttype = Types.TableType (l, Types.AnyFuncType)
     } in
     [Helper.as_phrase table]
 
-(* 
+(*
 let rec ds_to_list l sol i = match sol with
-  | (s, o)::rst -> 
+  | (s, o)::rst ->
     let ds = Helper.as_phrase ({
       Ast.index = as_phrase (Int32.of_int i);
       Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int o)))) ];
@@ -119,7 +185,7 @@ let rec ds_to_list l sol i = match sol with
 
 let data_segments_gen = function
   | None   -> Gen.return []
-  | Some (l: (Int32.t Types.limits)) -> 
+  | Some (l: (Int32.t Types.limits)) ->
     let min = (Int32.to_int l.min) in
     if min > 0
     then Gen.(
@@ -144,7 +210,7 @@ let data_segment_gen n = Gen.(
 
 let data_segment_list_gen = function
   | None   -> Gen.return []
-  | Some (l: (Int32.t Types.limits)) -> 
+  | Some (l: (Int32.t Types.limits)) ->
     let min = (Int32.to_int l.min) in
     if min > 0
     then Gen.(
@@ -154,39 +220,40 @@ let data_segment_list_gen = function
     else Gen.return []
 
 let elem_segment_gen n m = Gen.(
-  pair (int_bound n) (list (int_bound m)) >>= fun (o, il) ->
-    let init = List.map (fun i -> as_phrase (Int32.of_int i)) il in  
-      return (as_phrase ({
-        Ast.index = as_phrase (Int32.of_int 0);
-        Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int o)))) ];
-        Ast.init = init;
-      }))
+  int_bound n >>= fun o ->
+    list_size (int_bound (n - o)) (int_bound m) >>= fun il ->
+      let init = List.map (fun i -> as_phrase (Int32.of_int i)) il in
+        return (as_phrase ({
+          Ast.index = as_phrase (Int32.of_int 0);
+          Ast.offset = as_phrase [ as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int o)))) ];
+          Ast.init = init;
+        }))
 )
 
 let elem_segment_list_gen m = function
   | None   -> Gen.return []
-  | Some (l: (Int32.t Types.limits)) -> 
+  | Some (l: (Int32.t Types.limits)) ->
     let min = (Int32.to_int l.min) in
     if min > 0
     then Gen.(
-      list_size (int_bound min) (elem_segment_gen (min * 65536) m ) >>= fun el ->
+      list_size (int_bound min) (elem_segment_gen min m ) >>= fun el ->
         return el
     )
     else Gen.return []
 
 (* as_phrase ({ Ast.gtype= Types.GlobalType (Types.I32Type, Immutable); Ast.value = as_phrase [] }) *)
 let globals_gen con =
-  let rec rec_glob_gen con' globals glist = 
+  let rec rec_glob_gen con' globals glist =
     Gen.(
     match glist with
       | t::rst -> let t_opt = Some (t) in
         let rules = [ (1, const_gen con' t_opt 1); (*(11, getGlobal_gen con' t_opt 1);*) ] in
-        (Instr_gen.generate_rule rules >>= fun instrs_opt -> 
+        (Instr_gen.generate_rule rules >>= fun instrs_opt ->
           (match instrs_opt with
-            | Some (con'', inst, ts') -> 
+            | Some (con'', inst, ts') ->
               oneofl [ Types.Immutable; Types.Mutable; ] >>= fun mutability ->
-                (rec_glob_gen con' (globals@[(t, mutability, inst)]) rst) 
-            | None                    -> (rec_glob_gen con' globals rst) 
+                (rec_glob_gen con' (globals@[(t, mutability, inst)]) rst)
+            | None                    -> (rec_glob_gen con' globals rst)
           ))
       | []     -> return globals )
   in
@@ -201,38 +268,38 @@ let triple_to_global = function (t, m, inst) ->
 exception Type_not_expected of string;;
 
 let process_globals con gtypelist =
-  let rec rec_glob_process globals glist index = 
+  let rec rec_glob_process globals glist index =
     match glist with
-      | g::rst -> 
-        let nglobals = function (t, m, inst) -> 
+      | g::rst ->
+        let nglobals = function (t, m, inst) ->
             (match t with
-              | Helper.I32Type -> 
+              | Helper.I32Type ->
                 {
-                  i32 = globals.i32@[(index, m)];
-                  i64 = globals.i64;
-                  f32 = globals.f32;
-                  f64 = globals.f64;
+                  g_i32 = globals.g_i32@[(index, m)];
+                  g_i64 = globals.g_i64;
+                  g_f32 = globals.g_f32;
+                  g_f64 = globals.g_f64;
                 }
-              | Helper.I64Type -> 
+              | Helper.I64Type ->
                 {
-                  i32 = globals.i32;
-                  i64 = globals.i64@[(index, m)];
-                  f32 = globals.f32;
-                  f64 = globals.f64;
+                  g_i32 = globals.g_i32;
+                  g_i64 = globals.g_i64@[(index, m)];
+                  g_f32 = globals.g_f32;
+                  g_f64 = globals.g_f64;
                 }
-              | Helper.F32Type -> 
+              | Helper.F32Type ->
                 {
-                  i32 = globals.i32;
-                  i64 = globals.i64;
-                  f32 = globals.f32@[(index, m)];
-                  f64 = globals.f64;
+                  g_i32 = globals.g_i32;
+                  g_i64 = globals.g_i64;
+                  g_f32 = globals.g_f32@[(index, m)];
+                  g_f64 = globals.g_f64;
                 }
-              | Helper.F64Type -> 
+              | Helper.F64Type ->
                 {
-                  i32 = globals.i32;
-                  i64 = globals.i64;
-                  f32 = globals.f32;
-                  f64 = globals.f64@[(index, m)];
+                  g_i32 = globals.g_i32;
+                  g_i64 = globals.g_i64;
+                  g_f32 = globals.g_f32;
+                  g_f64 = globals.g_f64@[(index, m)];
                 }
               | Helper.IndexType -> raise (Type_not_expected "")
               ) in
@@ -254,19 +321,26 @@ let process_globals con gtypelist =
     funcindex = con.funcindex;
   }
 
-let context_gen = 
-  Gen.(func_type_list_gen2 >>= fun funcs ->
+let context_gen =
+  Gen.(
     pair (limits_gen (int_of_float (2.0 ** 16.0))) (limits_gen (int_of_float (2.0 ** 32.0))) >>= fun (mems, tables) ->
       return {
         labels = [];
         locals = [];
         globals = {
-          i32 = [];
-          i64 = [];
-          f32 = [];
-          f64 = [];
+          g_i32 = [];
+          g_i64 = [];
+          g_f32 = [];
+          g_f64 = [];
         };
-        funcs = ([], None)::([], Some (Helper.I32Type))::funcs;
+        funcs = {
+          f_none = [(1, [])];
+          f_i32 =  [(0, [])];
+          f_i64 =  [];
+          f_f32 =  [];
+          f_f64 =  [];
+        };
+        (* funcs = ([], None)::([], Some (Helper.I32Type))::funcs; *)
         imports = [([Helper.I32Type], None)];
         mems = mems;
         data = [];
@@ -284,8 +358,50 @@ let rec func_type_list_to_type_phrase func_type_list = match func_type_list with
       (as_phrase (Types.FuncType (Helper.to_stack_type (fst e), ot_opt)))::(func_type_list_to_type_phrase rst)
   | []     -> []
 
-let context_with_ftype con funcindex = 
-  let ftype = List.nth con.funcs funcindex
+let get_ftype con funci =
+  let rec find_findex flist t funci =
+    match flist with 
+      | []      -> None
+      | e::rst  -> 
+        if fst e = funci
+        then Some (snd e, t)
+        else find_findex rst t funci
+  in
+  let ftype = find_findex con.funcs.f_none None funci
+  in
+  if ftype <> None
+  then ftype
+  else (
+    let ftype = find_findex con.funcs.f_i32 (Some I32Type) funci
+    in
+    if ftype <> None
+    then ftype 
+    else (
+      let ftype = find_findex con.funcs.f_i64 (Some I64Type) funci
+      in
+      if ftype <> None
+      then ftype 
+      else (
+        let ftype = find_findex con.funcs.f_f32 (Some F32Type) funci
+        in
+        if ftype <> None
+        then ftype 
+        else (
+          let ftype = find_findex con.funcs.f_f64 (Some F64Type) funci
+          in
+          if ftype <> None
+          then ftype 
+          else None
+        )
+      )  
+    ) 
+  )
+
+let context_with_ftype con funcindex =
+  (* let ftype = List.nth con.funcs funcindex *)
+  let ftype = match get_ftype con funcindex with
+    | Some e -> e
+    | _      -> raise (Type_not_expected "")
   in
     let label = [snd ftype, snd ftype]
     in
@@ -304,7 +420,7 @@ let context_with_ftype con funcindex =
       } in
       con'
 
-let extend_context con data elems = 
+let extend_context con data elems =
   let con' = {
     labels = con.labels;
     locals = con.locals;
@@ -326,10 +442,10 @@ let rec rec_func_gen con res func_types index = Gen.(match func_types with
                 | Some t -> [t]
                 | None   -> []
               in
-              (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt -> 
+              (Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt ->
                 (let instrs = match instrs_opt with
                     | Some inst -> inst
-                    | None      -> [] 
+                    | None      -> []
                   in
                   let func = as_phrase (get_func (Helper.to_stack_type (fst e)) (as_phrase (Int32.of_int (index + 1))) (List.rev instrs)) in
                     rec_func_gen con (func::res) rst (index + 1)
@@ -338,27 +454,29 @@ let rec rec_func_gen con res func_types index = Gen.(match func_types with
   | []     -> return res)
 
 let module_gen = Gen.(
-  context_gen >>= fun context -> 
+  context_gen >>= fun context ->
     globals_gen context >>= fun gltypelist ->
-      pair (data_segment_list_gen context.mems) (elem_segment_list_gen (List.length context.funcs) context.tables) >>= fun (ds,es) ->
-        let con' = extend_context context ds es in
-          let con = process_globals con' gltypelist in
-            rec_func_gen con [] con.funcs 0 >>= fun funcs ->        
-              return (as_phrase 
-                (get_module 
-                  (func_type_list_to_type_phrase (([Helper.I32Type], None)::con.funcs)) 
-                  (List.rev funcs) 
-                  (limits_to_ast_memory con.mems) 
-                  (List.map triple_to_global gltypelist)
-                  con.data
-                  (limits_to_ast_table con.tables)
-                  con.elems))
+      func_type_list_gen2 >>= fun ftypelist ->
+        pair (data_segment_list_gen context.mems) (elem_segment_list_gen (List.length ftypelist) context.tables) >>= fun (ds,es) ->
+          let con = extend_context context ds es in
+            let con' = process_globals con gltypelist in
+              let con'' = process_funcs con' ftypelist in 
+                rec_func_gen con'' [] (([], None)::([], Some (Helper.I32Type))::ftypelist) 0 >>= fun funcs ->
+                  return (as_phrase
+                    (get_module
+                      (func_type_list_to_type_phrase (([Helper.I32Type], None)::([], None)::([], Some (Helper.I32Type))::ftypelist))
+                      (List.rev funcs)
+                      (limits_to_ast_memory con''.mems)
+                      (List.map triple_to_global gltypelist)
+                      con''.data
+                      (limits_to_ast_table con''.tables)
+                      con''.elems))
   )
 
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1 
+  Test.make ~name:"Modules" ~count:1
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
@@ -412,5 +530,5 @@ let s = F32.sqrt f
 ;;
 
 print_endline (F32.to_string s)
- 
+
 *)
