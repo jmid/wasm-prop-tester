@@ -8,7 +8,7 @@ type globals_ = {
   g_f64: (int * Types.mutability) list;
 }
 
-type value_type = I32Type | I64Type | F32Type | F64Type | IndexType
+type value_type = I32Type | I64Type | F32Type | F64Type | IndexType | TableIndex of int
 
 type funcs_ = {
   f_none: (int * value_type list) list;
@@ -38,11 +38,12 @@ type context_ = {
 }
 
 let to_wasm_value_type = function
-  | I32Type   -> Types.I32Type
-  | I64Type   -> Types.I64Type
-  | F32Type   -> Types.F32Type
-  | F64Type   -> Types.F64Type
-  | IndexType -> Types.I32Type
+  | I32Type      -> Types.I32Type
+  | I64Type      -> Types.I64Type
+  | F32Type      -> Types.F32Type
+  | F64Type      -> Types.F64Type
+  | IndexType    -> Types.I32Type
+  | TableIndex _ -> Types.I32Type
 
 let rec to_stack_type = function
   | []     -> []
@@ -133,7 +134,8 @@ let get_global_indexes t (l: globals_) m =
           | Some n ->  
             if n = m' then i::l else l 
           | None   -> i::l)) [] l.g_f64
-    | IndexType -> []
+    | IndexType    -> []
+    | TableIndex _ -> []
 
 
 (** get_random_element: 'a -> ('a * 'b) list -> 'b **)
@@ -174,6 +176,70 @@ let get_random_global a l index =
   match List.length type_list with
     | 0 -> None
     | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None     
+
+let get_findex t_opt elems = 
+  let rec indices il eindex =
+    try 
+      let elem = elems.(eindex) in
+      let il' =
+        match elem with 
+          | None    -> il
+          | Some e  ->
+            (if (fst e) = t_opt
+            then (eindex, snd e)::il
+            else il)
+      in
+      indices il' (eindex + 1)
+    with Invalid_argument _ -> il
+  in
+  indices [] 0
+
+let get_ftype con funci =
+  let rec find_findex flist t funci =
+    match flist with 
+      | []      -> None
+      | e::rst  -> 
+        if fst e = funci
+        then Some (snd e, t)
+        else find_findex rst t funci
+  in
+  let ftype = find_findex con.funcs.f_none None funci
+  in
+  if ftype <> None
+  then ftype
+  else (
+    let ftype = find_findex con.funcs.f_i32 (Some I32Type) funci
+    in
+    if ftype <> None
+    then ftype 
+    else (
+      let ftype = find_findex con.funcs.f_i64 (Some I64Type) funci
+      in
+      if ftype <> None
+      then ftype 
+      else (
+        let ftype = find_findex con.funcs.f_f32 (Some F32Type) funci
+        in
+        if ftype <> None
+        then ftype 
+        else (
+          let ftype = find_findex con.funcs.f_f64 (Some F64Type) funci
+          in
+          if ftype <> None
+          then ftype 
+          else None
+        )
+      )  
+    ) 
+  ) 
+
+  (* Array.fold_left 
+    (fun l (t, i) -> 
+      if t_opt = t 
+      then i::l
+      else l)
+    []
+    elems *)
 
 (*
 (** get_indexes: a' -> a list -> int list **)

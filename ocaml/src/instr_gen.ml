@@ -83,12 +83,12 @@ let rec instrs_rule context input_ts output_ts size =
 and instr_rule con t_opt size = 
   let rules = match t_opt with
     | None   -> (match size with
-      | 0 -> [(1, nop_gen con t_opt size); (10, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (*(1, call_gen con t_opt size);*)]
+      | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (*(1, call_gen con t_opt size);*)]
       | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
               (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); 
-              (1, call_gen con t_opt size); (11, store_gen con t_opt size);(*(11, store_gen con t_opt size);*)])
+              (1, call_gen con t_opt size); (1, store_gen con t_opt size);(*(11, store_gen con t_opt size);*)])
     | Some _ -> (match size with 
-      | 0 -> [(1, const_gen con t_opt size); (10, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
+      | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
       | n -> [(1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
               (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); 
               (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
@@ -96,7 +96,7 @@ and instr_rule con t_opt size =
               (*(5, setLocal_gen con t_opt size);*) (5, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);*)
               (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (11, br_gen con t_opt size); 
               (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size); 
-              (1, call_gen con t_opt size); (*(11, callindirect_gen con t_opt size);*)
+              (1, call_gen con t_opt size); (30, callindirect_gen con t_opt size);
               (1, memorysize_gen con t_opt size); (1, memorygrow_gen con t_opt size);])
   in generate_rule rules
 
@@ -153,7 +153,8 @@ and const_gen con t_opt size = match t_opt with
       else Gen.( int_bound ((min * 65536) - 8) >>= fun i ->
         return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), [])))
     | None     -> Gen.return None)
-  | None               -> Gen.return None
+  | Some Helper.TableIndex i  -> Gen.return (Some (con, Helper.as_phrase (Ast.Const (Helper.as_phrase (Values.I32 (Int32.of_int i)))), []))
+  | None                      -> Gen.return None
 
 (*** Unary operations ***)
 (** intOp_unop_gen : IntOp.unop Gen.t **)
@@ -509,31 +510,36 @@ and return_gen (con: context_) t_opt size =
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and call_gen (con: context_) t_opt size = 
   let ilist = match t_opt with 
-    | None           -> con.funcs.f_none
-    | Some I32Type   -> con.funcs.f_i32
-    | Some I64Type   -> con.funcs.f_i64
-    | Some F32Type   -> con.funcs.f_f32
-    | Some F64Type   -> con.funcs.f_f64
-    | Some IndexType -> []
+    | None               -> con.funcs.f_none
+    | Some I32Type       -> con.funcs.f_i32
+    | Some I64Type       -> con.funcs.f_i64
+    | Some F32Type       -> con.funcs.f_f32
+    | Some F64Type       -> con.funcs.f_f64
+    | Some IndexType     -> []
+    | Some TableIndex _  -> []
   in
   if List.length ilist < 1 
   then Gen.return None
   else Gen.(
     oneofl ilist >>= fun (i, t) ->
-    return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev t)))
+      return (Some (con, Helper.as_phrase (Ast.Call (Helper.as_phrase (Int32.of_int i))), (List.rev t)))
   )
 
-(*
 (*** CallIndirect ***)
 (** callindirect_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and callindirect_gen (con: context_) t_opt size = 
-  match Helper.get_indexes_and_inputs2 t_opt con.tables with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,tlist) -> return (Some (con, Helper.as_phrase (Ast.CallIndirect (Helper.as_phrase (Int32.of_int i))), tlist)) )
-    | []    -> Gen.return None
-*)
-
-
-
+  match con.elems with 
+    | None   -> Gen.return None
+    | Some a -> let ilist = Helper.get_findex t_opt a in
+      if List.length ilist < 1
+      then Gen.return None
+      else Gen.( oneofl ilist >>= fun e ->
+        let ftype_opt = Helper.get_ftype con (snd e) in
+          match ftype_opt with 
+            | None       -> return None
+            | Some ftype -> 
+              return (Some (con, Helper.as_phrase (Ast.CallIndirect (Helper.as_phrase (Int32.of_int (snd e)))), (TableIndex (fst e))::(List.rev (fst ftype))))
+      )
 
 (*(*** Statistics ***)
 let length_stat list_opt = match list_opt with

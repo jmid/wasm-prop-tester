@@ -123,12 +123,12 @@ let process_funcs con flist =
             f_f32  = funcs.f_f32;
             f_f64  = (i, fst e)::funcs.f_f64;
           }
-        | Some IndexType  -> 
+        | Some _          -> 
           funcs
         ) in
         process_flist funcs' (i+1) rst
       ) in    
-      let funcs = process_flist con.funcs 2 flist in
+      let funcs = process_flist con.funcs 3 flist in
       {
         labels = con.labels;
         locals = con.locals;
@@ -221,7 +221,7 @@ let data_segment_list_gen = function
 
 let elem_segment_gen n m = Gen.(
   int_bound n >>= fun o ->
-    list_size (int_bound (n - o)) (int_bound m) >>= fun il ->
+    list_size (int_bound (n - o)) (int_bound (m-1)) >>= fun il ->
       return (o, il)
       (* let init = List.map (fun i -> as_phrase (Int32.of_int i)) il in
         return (as_phrase ({
@@ -344,7 +344,7 @@ let process_globals con gtypelist =
                   g_f32 = globals.g_f32;
                   g_f64 = globals.g_f64@[(index, m)];
                 }
-              | Helper.IndexType -> raise (Type_not_expected "")
+              | _ -> raise (Type_not_expected "")
               ) in
         rec_glob_process (nglobals g) rst (index + 1)
       | []     -> globals
@@ -366,7 +366,7 @@ let process_globals con gtypelist =
 
 let context_gen =
   Gen.(
-    pair (limits_gen (int_of_float (2.0 ** 16.0))) (limits_gen (int_of_float (2.0 ** 32.0))) >>= fun (mems, tables) ->
+    pair (limits_gen (int_of_float (2.0 ** 16.0))) (limits_gen 10000000 (*int_of_float (2.0 ** 32.0)*)) >>= fun (mems, tables) ->
       return {
         labels = [];
         locals = [];
@@ -377,8 +377,8 @@ let context_gen =
           g_f64 = [];
         };
         funcs = {
-          f_none = [(1, [])];
-          f_i32 =  [(0, [])];
+          f_none = [(0, [Helper.I32Type]); (1, [])];
+          f_i32 =  [(2, [])];
           f_i64 =  [];
           f_f32 =  [];
           f_f64 =  [];
@@ -401,53 +401,14 @@ let rec func_type_list_to_type_phrase func_type_list = match func_type_list with
       (as_phrase (Types.FuncType (Helper.to_stack_type (fst e), ot_opt)))::(func_type_list_to_type_phrase rst)
   | []     -> []
 
-let get_ftype con funci =
-  let rec find_findex flist t funci =
-    match flist with 
-      | []      -> None
-      | e::rst  -> 
-        if fst e = funci
-        then Some (snd e, t)
-        else find_findex rst t funci
-  in
-  let ftype = find_findex con.funcs.f_none None funci
-  in
-  if ftype <> None
-  then ftype
-  else (
-    let ftype = find_findex con.funcs.f_i32 (Some I32Type) funci
-    in
-    if ftype <> None
-    then ftype 
-    else (
-      let ftype = find_findex con.funcs.f_i64 (Some I64Type) funci
-      in
-      if ftype <> None
-      then ftype 
-      else (
-        let ftype = find_findex con.funcs.f_f32 (Some F32Type) funci
-        in
-        if ftype <> None
-        then ftype 
-        else (
-          let ftype = find_findex con.funcs.f_f64 (Some F64Type) funci
-          in
-          if ftype <> None
-          then ftype 
-          else None
-        )
-      )  
-    ) 
-  )
-
 let process_elems (con: context_) el = 
   let rec elem_array elems i = function
     | []      -> elems
-    | e::rst  -> 
-      let ftype_opt = get_ftype con e in 
+    | findex::rst  -> 
+      let ftype_opt = get_ftype con findex in 
       let elems' = match ftype_opt with 
         | None        -> elems
-        | Some ftype  -> elems.(i) <- Some (snd ftype, i); elems in
+        | Some ftype  -> elems.(i) <- Some (snd ftype, findex); elems in
       elem_array elems' (i + 1) rst in
   let rec set_up elems = function
     | []      -> elems
@@ -475,7 +436,7 @@ let context_with_ftype con funcindex =
   (* let ftype = List.nth con.funcs funcindex *)
   let ftype = match get_ftype con funcindex with
     | Some e -> e
-    | _      -> raise (Type_not_expected "")
+    | _      -> raise (Type_not_expected (string_of_int funcindex))
   in
     let label = [snd ftype, snd ftype]
     in
@@ -490,7 +451,7 @@ let context_with_ftype con funcindex =
         return = snd ftype;
         tables = con.tables;
         elems = con.elems;
-        funcindex = funcindex + 1;
+        funcindex = funcindex;
       } in
       con'
 
@@ -521,7 +482,7 @@ let rec rec_func_gen con res func_types index = Gen.(match func_types with
                     | Some inst -> inst
                     | None      -> []
                   in
-                  let func = as_phrase (get_func (Helper.to_stack_type (fst e)) (as_phrase (Int32.of_int (index + 1))) (List.rev instrs)) in
+                  let func = as_phrase (get_func (Helper.to_stack_type (fst e)) (as_phrase (Int32.of_int index)) (List.rev instrs)) in
                     rec_func_gen con (func::res) rst (index + 1)
                 )
               )
@@ -537,7 +498,7 @@ let module_gen = Gen.(
               let con'' = process_funcs con' ftypelist in 
                 elem_segment_list_gen (List.length (([Helper.I32Type], None)::([], None)::([], Some (Helper.I32Type))::ftypelist)) con''.tables >>= fun es ->
                   let con''' = process_elems con'' es in               
-                    rec_func_gen con''' [] (([], None)::([], Some (Helper.I32Type))::ftypelist) 0 >>= fun funcs ->
+                    rec_func_gen con''' [] (([], None)::([], Some (Helper.I32Type))::ftypelist) 1 >>= fun funcs ->
                       return (as_phrase
                         (get_module
                           (func_type_list_to_type_phrase (([Helper.I32Type], None)::([], None)::([], Some (Helper.I32Type))::ftypelist))
@@ -562,7 +523,10 @@ let module_test =
   )
 ;;
 
-QCheck_runner.set_seed(265188083);;
+(* QCheck_runner.set_seed(31444403);; *)
+(* QCheck_runner.set_seed(3606552);; *)
+(* QCheck_runner.set_seed(243782223);; *)
+(* QCheck_runner.set_seed(265188083);; *)
 (* QCheck_runner.set_seed(196716697);; *)
 (* QCheck_runner.set_seed(182324116);; *)
 (* QCheck_runner.set_seed(15600868);; *)
