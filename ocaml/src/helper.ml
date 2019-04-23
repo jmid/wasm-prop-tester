@@ -2,10 +2,14 @@ open Wasm
 open QCheck
 
 type globals_ = {
-  g_i32: (int * Types.mutability) list;
-  g_i64: (int * Types.mutability) list;
-  g_f32: (int * Types.mutability) list;
-  g_f64: (int * Types.mutability) list;
+  g_m_i32: int list;
+  g_im_i32: int list;
+  g_m_i64: int list;
+  g_im_i64: int list;
+  g_m_f32: int list;
+  g_im_f32: int list;
+  g_m_f64: int list;
+  g_im_f64: int list;
 }
 
 type value_type = I32Type | I64Type | F32Type | F64Type | IndexType | TableIndex of int
@@ -110,30 +114,34 @@ let mToString = function
 (** get_global_indexes: a' -> a list -> int list **)
 let get_global_indexes t (l: globals_) m =
   match t with 
-    | I32Type -> List.fold_left 
-      (fun l (i, m') -> 
-        (match m with
-          | Some n ->  
-            if n = m' then i::l else l 
-          | None   -> i::l)) [] l.g_i32
-    | I64Type -> List.fold_left 
-      (fun l (i, m') -> 
-        (match m with
-          | Some n ->  
-            if n = m' then i::l else l 
-          | None   -> i::l)) [] l.g_i64
-    | F32Type -> List.fold_left 
-      (fun l (i, m') -> 
-        (match m with
-          | Some n ->  
-            if n = m' then i::l else l 
-          | None   -> i::l)) [] l.g_f32
-    | F64Type -> List.fold_left 
-      (fun l (i, m') -> 
-        (match m with
-          | Some n ->  
-            if n = m' then i::l else l 
-          | None   -> i::l)) [] l.g_f64
+    | I32Type -> (match m with
+      | Some m' -> (match m' with 
+          | Types.Mutable   -> l.g_m_i32
+          | Types.Immutable -> l.g_im_i32
+        )
+      | None    -> l.g_im_i32
+      )
+    | I64Type -> (match m with
+      | Some m' -> (match m' with 
+          | Types.Mutable   -> l.g_m_i64
+          | Types.Immutable -> l.g_im_i64
+        )
+      | None    -> l.g_im_i64
+      )
+    | F32Type -> (match m with
+      | Some m' -> (match m' with 
+          | Types.Mutable   -> l.g_m_f32
+          | Types.Immutable -> l.g_im_f32
+        )
+      | None    -> l.g_im_f32
+      )
+    | F64Type ->  (match m with
+      | Some m' -> (match m' with 
+          | Types.Mutable   -> l.g_m_f64
+          | Types.Immutable -> l.g_im_f64
+        )
+      | None    -> l.g_im_f64
+      )
     | IndexType    -> []
     | TableIndex _ -> []
 

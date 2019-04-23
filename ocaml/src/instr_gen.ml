@@ -89,14 +89,14 @@ and instr_rule con t_opt size =
               (1, call_gen con t_opt size); (1, store_gen con t_opt size);(*(11, store_gen con t_opt size);*)])
     | Some _ -> (match size with 
       | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
-      | n -> [(1, const_gen con t_opt size); (9, unop_gen con t_opt size); (9, binop_gen con t_opt size); 
-              (9, testop_gen con t_opt size); (9, relop_gen con t_opt size); (9, cvtop_gen con t_opt size); 
-              (1, nop_gen con t_opt size); (5, block_gen con t_opt size); (5, loop_gen con t_opt size);
-              (11, if_gen con t_opt size); (5, select_gen con t_opt size); (*(11, getLocal_gen con t_opt size);*)
-              (*(5, setLocal_gen con t_opt size);*) (5, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);*)
-              (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (11, br_gen con t_opt size); 
-              (11, brif_gen con t_opt size); (11, brtable_gen con t_opt size); 
-              (1, call_gen con t_opt size); (30, callindirect_gen con t_opt size);
+      | n -> [(1, const_gen con t_opt size); (1, unop_gen con t_opt size); (1, binop_gen con t_opt size); 
+              (1, testop_gen con t_opt size); (1, relop_gen con t_opt size); (1, cvtop_gen con t_opt size); 
+              (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
+              (1, if_gen con t_opt size); (1, select_gen con t_opt size); (*(11, getLocal_gen con t_opt size);*)
+              (*(5, setLocal_gen con t_opt size);*) (1, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);*)
+              (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (1, br_gen con t_opt size); 
+              (1, brif_gen con t_opt size); (1, brtable_gen con t_opt size); 
+              (1, call_gen con t_opt size); (1, callindirect_gen con t_opt size);
               (1, memorysize_gen con t_opt size); (1, memorygrow_gen con t_opt size);])
   in generate_rule rules
 

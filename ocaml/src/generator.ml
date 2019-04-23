@@ -36,10 +36,14 @@ let context = {
   labels = [];
   locals = [];
   globals = {
-    g_i32 = [];
-    g_i64 = [];
-    g_f32 = [];
-    g_f64 = [];
+    g_m_i32 = [];
+    g_im_i32 = [];
+    g_m_i64 = [];
+    g_im_i64 = [];
+    g_m_f32 = [];
+    g_im_f32 = [];
+    g_m_f64 = [];
+    g_im_f64 = [];
   };
   funcs = {
     f_none = [];
@@ -315,37 +319,105 @@ let process_globals con gtypelist =
     match glist with
       | g::rst ->
         let nglobals = function (t, m, inst) ->
-            (match t with
-              | Helper.I32Type ->
+          (match t with
+            | Helper.I32Type -> (match m with 
+              | Types.Mutable   ->
                 {
-                  g_i32 = globals.g_i32@[(index, m)];
-                  g_i64 = globals.g_i64;
-                  g_f32 = globals.g_f32;
-                  g_f64 = globals.g_f64;
+                  g_m_i32  = globals.g_m_i32@[index];
+                  g_im_i32 = globals.g_im_i32;
+                  g_m_i64  = globals.g_m_i64;
+                  g_im_i64 = globals.g_im_i64;
+                  g_m_f32  = globals.g_m_f32;
+                  g_im_f32 = globals.g_im_f32;
+                  g_m_f64  = globals.g_m_f64;
+                  g_im_f64 = globals.g_im_f64;
                 }
-              | Helper.I64Type ->
+              | Types.Immutable ->
                 {
-                  g_i32 = globals.g_i32;
-                  g_i64 = globals.g_i64@[(index, m)];
-                  g_f32 = globals.g_f32;
-                  g_f64 = globals.g_f64;
+                  g_m_i32  = globals.g_m_i32;
+                  g_im_i32 = globals.g_im_i32@[index];
+                  g_m_i64  = globals.g_m_i64;
+                  g_im_i64 = globals.g_im_i64;
+                  g_m_f32  = globals.g_m_f32;
+                  g_im_f32 = globals.g_im_f32;
+                  g_m_f64  = globals.g_m_f64;
+                  g_im_f64 = globals.g_im_f64;
                 }
-              | Helper.F32Type ->
+              )
+            | Helper.I64Type ->(match m with 
+              | Types.Mutable   ->
                 {
-                  g_i32 = globals.g_i32;
-                  g_i64 = globals.g_i64;
-                  g_f32 = globals.g_f32@[(index, m)];
-                  g_f64 = globals.g_f64;
+                  g_m_i32  = globals.g_m_i32;
+                  g_im_i32 = globals.g_im_i32;
+                  g_m_i64  = globals.g_m_i64@[index];
+                  g_im_i64 = globals.g_im_i64;
+                  g_m_f32  = globals.g_m_f32;
+                  g_im_f32 = globals.g_im_f32;
+                  g_m_f64  = globals.g_m_f64;
+                  g_im_f64 = globals.g_im_f64;
                 }
-              | Helper.F64Type ->
+              | Types.Immutable ->
                 {
-                  g_i32 = globals.g_i32;
-                  g_i64 = globals.g_i64;
-                  g_f32 = globals.g_f32;
-                  g_f64 = globals.g_f64@[(index, m)];
+                  g_m_i32  = globals.g_m_i32;
+                  g_im_i32 = globals.g_im_i32;
+                  g_m_i64  = globals.g_m_i64;
+                  g_im_i64 = globals.g_im_i64@[index];
+                  g_m_f32  = globals.g_m_f32;
+                  g_im_f32 = globals.g_im_f32;
+                  g_m_f64  = globals.g_m_f64;
+                  g_im_f64 = globals.g_im_f64;
                 }
-              | _ -> raise (Type_not_expected "")
-              ) in
+              )
+            | Helper.F32Type -> (match m with
+              | Types.Mutable   ->
+                {
+                  g_m_i32  = globals.g_m_i32;
+                  g_im_i32 = globals.g_im_i32;
+                  g_m_i64  = globals.g_m_i64;
+                  g_im_i64 = globals.g_im_i64;
+                  g_m_f32  = globals.g_m_f32@[index];
+                  g_im_f32 = globals.g_im_f32;
+                  g_m_f64  = globals.g_m_f64;
+                  g_im_f64 = globals.g_im_f64;
+                }
+              | Types.Immutable ->
+                {
+                  g_m_i32  = globals.g_m_i32;
+                  g_im_i32 = globals.g_im_i32;
+                  g_m_i64  = globals.g_m_i64;
+                  g_im_i64 = globals.g_im_i64;
+                  g_m_f32  = globals.g_m_f32;
+                  g_im_f32 = globals.g_im_f32@[index];
+                  g_m_f64  = globals.g_m_f64;
+                  g_im_f64 = globals.g_im_f64;
+                }
+              )
+            | Helper.F64Type ->(match m with 
+              | Types.Mutable   ->
+                {
+                  g_m_i32  = globals.g_m_i32;
+                  g_im_i32 = globals.g_im_i32;
+                  g_m_i64  = globals.g_m_i64;
+                  g_im_i64 = globals.g_im_i64;
+                  g_m_f32  = globals.g_m_f32;
+                  g_im_f32 = globals.g_im_f32;
+                  g_m_f64  = globals.g_m_f64@[index];
+                  g_im_f64 = globals.g_im_f64;
+                }
+              | Types.Immutable ->
+                {
+                  g_m_i32  = globals.g_m_i32;
+                  g_im_i32 = globals.g_im_i32;
+                  g_m_i64  = globals.g_m_i64;
+                  g_im_i64 = globals.g_im_i64;
+                  g_m_f32  = globals.g_m_f32;
+                  g_im_f32 = globals.g_im_f32;
+                  g_m_f64  = globals.g_m_f64;
+                  g_im_f64 = globals.g_im_f64@[index];
+                }
+              )
+            | _ -> raise (Type_not_expected "")
+            ) in
         rec_glob_process (nglobals g) rst (index + 1)
       | []     -> globals
   in
@@ -371,10 +443,14 @@ let context_gen =
         labels = [];
         locals = [];
         globals = {
-          g_i32 = [];
-          g_i64 = [];
-          g_f32 = [];
-          g_f64 = [];
+          g_m_i32 = [];
+          g_im_i32 = [];
+          g_m_i64 = [];
+          g_im_i64 = [];
+          g_m_f32 = [];
+          g_im_f32 = [];
+          g_m_f64 = [];
+          g_im_f64 = [];
         };
         funcs = {
           f_none = [(0, [Helper.I32Type]); (1, [])];
@@ -513,7 +589,7 @@ let module_gen = Gen.(
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:1
+  Test.make ~name:"Modules" ~count:10
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
