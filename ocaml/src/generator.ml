@@ -92,60 +92,17 @@ let process_funcs con flist =
     | []      -> funcs
     | e::rst  -> 
       (let funcs' = (match snd e with 
-        | None    -> {
-            f_none = (i, fst e)::funcs.f_none;
-            f_i32  = funcs.f_i32;
-            f_i64  = funcs.f_i64;
-            f_f32  = funcs.f_f32;
-            f_f64  = funcs.f_f64;
-          }
-        | Some I32Type    -> {
-            f_none = funcs.f_none;
-            f_i32  = (i, fst e)::funcs.f_i32;
-            f_i64  = funcs.f_i64;
-            f_f32  = funcs.f_f32;
-            f_f64  = funcs.f_f64;
-          }
-        | Some I64Type    -> {
-            f_none = funcs.f_none;
-            f_i32  = funcs.f_i32;
-            f_i64  = (i, fst e)::funcs.f_i64;
-            f_f32  = funcs.f_f32;
-            f_f64  = funcs.f_f64;
-          }
-        | Some F32Type    -> {
-            f_none = funcs.f_none;
-            f_i32  = funcs.f_i32;
-            f_i64  = funcs.f_i64;
-            f_f32  = (i, fst e)::funcs.f_f32;
-            f_f64  = funcs.f_f64;
-          }
-        | Some F64Type    -> {
-            f_none = funcs.f_none;
-            f_i32  = funcs.f_i32;
-            f_i64  = funcs.f_i64;
-            f_f32  = funcs.f_f32;
-            f_f64  = (i, fst e)::funcs.f_f64;
-          }
-        | Some _          -> 
-          funcs
+        | None          -> { funcs with f_none = (i, fst e)::funcs.f_none; }
+        | Some I32Type  -> { funcs with f_i32  = (i, fst e)::funcs.f_i32; }
+        | Some I64Type  -> { funcs with f_i64  = (i, fst e)::funcs.f_i64; }
+        | Some F32Type  -> { funcs with f_f32  = (i, fst e)::funcs.f_f32; }
+        | Some F64Type  -> { funcs with f_f64  = (i, fst e)::funcs.f_f64; }
+        | Some _        -> funcs
         ) in
         process_flist funcs' (i+1) rst
       ) in    
-      let funcs = process_flist con.funcs 3 flist in
-      {
-        labels = con.labels;
-        locals = con.locals;
-        globals = con.globals;
-        funcs = funcs;
-        imports = con.imports;
-        mems = con.mems;
-        data = con.data;
-        return = con.return;
-        tables = con.tables;
-        elems = con.elems;
-        funcindex = con.funcindex;
-      }
+      let funcs_ = process_flist con.funcs 3 flist in
+        { con with funcs = funcs_; }
 
 (** limits_gen : limits list **)
 let limits_gen max_size = Gen.(
@@ -321,120 +278,28 @@ let process_globals con gtypelist =
         let nglobals = function (t, m, inst) ->
           (match t with
             | Helper.I32Type -> (match m with 
-              | Types.Mutable   ->
-                {
-                  g_m_i32  = globals.g_m_i32@[index];
-                  g_im_i32 = globals.g_im_i32;
-                  g_m_i64  = globals.g_m_i64;
-                  g_im_i64 = globals.g_im_i64;
-                  g_m_f32  = globals.g_m_f32;
-                  g_im_f32 = globals.g_im_f32;
-                  g_m_f64  = globals.g_m_f64;
-                  g_im_f64 = globals.g_im_f64;
-                }
-              | Types.Immutable ->
-                {
-                  g_m_i32  = globals.g_m_i32;
-                  g_im_i32 = globals.g_im_i32@[index];
-                  g_m_i64  = globals.g_m_i64;
-                  g_im_i64 = globals.g_im_i64;
-                  g_m_f32  = globals.g_m_f32;
-                  g_im_f32 = globals.g_im_f32;
-                  g_m_f64  = globals.g_m_f64;
-                  g_im_f64 = globals.g_im_f64;
-                }
+              | Types.Mutable   -> { globals with g_m_i32  = index::globals.g_m_i32; }
+              | Types.Immutable -> { globals with g_im_i32 = index::globals.g_im_i32; }
               )
             | Helper.I64Type ->(match m with 
-              | Types.Mutable   ->
-                {
-                  g_m_i32  = globals.g_m_i32;
-                  g_im_i32 = globals.g_im_i32;
-                  g_m_i64  = globals.g_m_i64@[index];
-                  g_im_i64 = globals.g_im_i64;
-                  g_m_f32  = globals.g_m_f32;
-                  g_im_f32 = globals.g_im_f32;
-                  g_m_f64  = globals.g_m_f64;
-                  g_im_f64 = globals.g_im_f64;
-                }
-              | Types.Immutable ->
-                {
-                  g_m_i32  = globals.g_m_i32;
-                  g_im_i32 = globals.g_im_i32;
-                  g_m_i64  = globals.g_m_i64;
-                  g_im_i64 = globals.g_im_i64@[index];
-                  g_m_f32  = globals.g_m_f32;
-                  g_im_f32 = globals.g_im_f32;
-                  g_m_f64  = globals.g_m_f64;
-                  g_im_f64 = globals.g_im_f64;
-                }
+              | Types.Mutable   -> { globals with g_m_i64  = index::globals.g_m_i64; }
+              | Types.Immutable -> { globals with g_im_i64 = index::globals.g_im_i64; }
               )
             | Helper.F32Type -> (match m with
-              | Types.Mutable   ->
-                {
-                  g_m_i32  = globals.g_m_i32;
-                  g_im_i32 = globals.g_im_i32;
-                  g_m_i64  = globals.g_m_i64;
-                  g_im_i64 = globals.g_im_i64;
-                  g_m_f32  = globals.g_m_f32@[index];
-                  g_im_f32 = globals.g_im_f32;
-                  g_m_f64  = globals.g_m_f64;
-                  g_im_f64 = globals.g_im_f64;
-                }
-              | Types.Immutable ->
-                {
-                  g_m_i32  = globals.g_m_i32;
-                  g_im_i32 = globals.g_im_i32;
-                  g_m_i64  = globals.g_m_i64;
-                  g_im_i64 = globals.g_im_i64;
-                  g_m_f32  = globals.g_m_f32;
-                  g_im_f32 = globals.g_im_f32@[index];
-                  g_m_f64  = globals.g_m_f64;
-                  g_im_f64 = globals.g_im_f64;
-                }
+              | Types.Mutable   -> { globals with g_m_f32  = index::globals.g_m_f32; }
+              | Types.Immutable -> { globals with g_im_f32 = index::globals.g_im_f32; }
               )
             | Helper.F64Type ->(match m with 
-              | Types.Mutable   ->
-                {
-                  g_m_i32  = globals.g_m_i32;
-                  g_im_i32 = globals.g_im_i32;
-                  g_m_i64  = globals.g_m_i64;
-                  g_im_i64 = globals.g_im_i64;
-                  g_m_f32  = globals.g_m_f32;
-                  g_im_f32 = globals.g_im_f32;
-                  g_m_f64  = globals.g_m_f64@[index];
-                  g_im_f64 = globals.g_im_f64;
-                }
-              | Types.Immutable ->
-                {
-                  g_m_i32  = globals.g_m_i32;
-                  g_im_i32 = globals.g_im_i32;
-                  g_m_i64  = globals.g_m_i64;
-                  g_im_i64 = globals.g_im_i64;
-                  g_m_f32  = globals.g_m_f32;
-                  g_im_f32 = globals.g_im_f32;
-                  g_m_f64  = globals.g_m_f64;
-                  g_im_f64 = globals.g_im_f64@[index];
-                }
+              | Types.Mutable   -> { globals with g_m_f64  = index::globals.g_m_f64; }
+              | Types.Immutable -> { globals with g_im_f64 = index::globals.g_im_f64; }
               )
             | _ -> raise (Type_not_expected "")
             ) in
         rec_glob_process (nglobals g) rst (index + 1)
       | []     -> globals
   in
-  let globals = rec_glob_process con.globals gtypelist 0 in
-  {
-    labels = con.labels;
-    locals = con.locals;
-    globals = globals;
-    funcs = con.funcs;
-    imports = con.imports;
-    mems = con.mems;
-    data = con.data;
-    return = con.return;
-    tables = con.tables;
-    elems = con.elems;
-    funcindex = con.funcindex;
-  }
+  let globals' = rec_glob_process con.globals gtypelist 0 in
+  { con with globals = globals'; }
 
 let context_gen =
   Gen.(
@@ -493,20 +358,8 @@ let process_elems (con: context_) el =
       | None   -> 0
       | Some (l: (Int32.t Types.limits)) -> Int32.to_int l.min
     ) in
-  let elems = Array.make size None in
-  {
-    labels = con.labels;
-    locals = con.locals;
-    globals = con.globals;
-    funcs = con.funcs;
-    imports = con.imports;
-    mems = con.mems;
-    data = con.data;
-    return = con.return;
-    tables = con.tables;
-    elems = Some (set_up elems el);
-    funcindex = con.funcindex;
-  }
+  let elems' = Array.make size None in
+  { con with elems = Some (set_up elems' el); }
 
 let context_with_ftype con funcindex =
   (* let ftype = List.nth con.funcs funcindex *)
@@ -514,38 +367,16 @@ let context_with_ftype con funcindex =
     | Some e -> e
     | _      -> raise (Type_not_expected (string_of_int funcindex))
   in
-    let label = [snd ftype, snd ftype]
-    in
-      let con' = {
+    let label = [snd ftype, snd ftype] in
+      { con with 
         labels = label;
         locals = fst ftype;
-        globals = con.globals;
-        funcs = con.funcs;
-        imports = con.imports;
-        mems = con.mems;
-        data = con.data;
         return = snd ftype;
-        tables = con.tables;
-        elems = con.elems;
         funcindex = funcindex;
-      } in
-      con'
+      }
 
-let extend_context con data =
-  let con' = {
-    labels = con.labels;
-    locals = con.locals;
-    globals = con.globals;
-    funcs = con.funcs;
-    imports = con.imports;
-    mems = con.mems;
-    data = data;
-    return = None;
-    tables = con.tables;
-    elems = con.elems;
-    funcindex = con.funcindex;
-  } in
-  con'
+let extend_context con data' =
+  { con with data = data'; }
 
 (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
 let rec rec_func_gen con res func_types index = Gen.(match func_types with
@@ -589,7 +420,7 @@ let module_gen = Gen.(
 let arb_module = make module_gen
 
 let module_test =
-  Test.make ~name:"Modules" ~count:10
+  Test.make ~name:"Modules" ~count:100
   arb_module
   (function m ->
     let arrange_m = Arrange.module_ m in
@@ -599,6 +430,9 @@ let module_test =
   )
 ;;
 
+QCheck_runner.set_seed(498103647);;
+
+(* QCheck_runner.set_seed(421117913);; *)
 (* QCheck_runner.set_seed(31444403);; *)
 (* QCheck_runner.set_seed(3606552);; *)
 (* QCheck_runner.set_seed(243782223);; *)

@@ -3,20 +3,7 @@ open QCheck
 open Helper
 
 let addLabel t_option con =
-  let con' = {
-    labels = t_option::con.labels;
-    locals = con.locals;
-    globals = con.globals;
-    funcs = con.funcs;
-    imports = con.imports;
-    mems = con.mems;
-    data = con.data;
-    return = con.return;
-    tables = con.tables;
-    elems = con.elems;
-    funcindex = con.funcindex;
-  } in
-  con'
+  { con with labels = t_option::con.labels; }
 
 (*
 type instr = instr' Source.phrase
@@ -84,14 +71,14 @@ and instr_rule con t_opt size =
   let rules = match t_opt with
     | None   -> (match size with
       | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); (*(1, call_gen con t_opt size);*)]
-      | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size); 
+      | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (**)(1, block_gen con t_opt size); 
               (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size); 
               (1, call_gen con t_opt size); (1, store_gen con t_opt size);(*(11, store_gen con t_opt size);*)])
     | Some _ -> (match size with 
       | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
       | n -> [(1, const_gen con t_opt size); (1, unop_gen con t_opt size); (1, binop_gen con t_opt size); 
               (1, testop_gen con t_opt size); (1, relop_gen con t_opt size); (1, cvtop_gen con t_opt size); 
-              (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
+              (1, nop_gen con t_opt size); (**)(1, block_gen con t_opt size); (1, loop_gen con t_opt size);
               (1, if_gen con t_opt size); (1, select_gen con t_opt size); (*(11, getLocal_gen con t_opt size);*)
               (*(5, setLocal_gen con t_opt size);*) (1, teeLocal_gen con t_opt size); (*(11, getGlobal_gen con t_opt size);*)
               (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (1, br_gen con t_opt size); 
@@ -422,7 +409,7 @@ and block_gen (con: context_) t_opt size =
     | Some t -> [t]
     | None   -> []
   in
-  Gen.(instrs_rule (addLabel (t_opt, t_opt) con) [] ot size >>= 
+  Gen.(instrs_rule (addLabel (t_opt, t_opt) con) [] ot (size/2) >>= 
     fun instrs_opt -> match instrs_opt with
       | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Block (Helper.to_stack_type ot, (List.rev instrs))), []))
       | None        -> return (Some (con, Helper.as_phrase (Ast.Block (Helper.to_stack_type ot, [])), [])) )
@@ -434,7 +421,7 @@ and loop_gen (con: context_) t_opt size =
     | Some t -> [t]
     | None   -> []
   in
-  Gen.(instrs_rule (addLabel (None, t_opt) con) [] ot size >>= 
+  Gen.(instrs_rule (addLabel (None, t_opt) con) [] ot (size/2) >>= 
     fun instrs_opt -> match instrs_opt with
       | Some instrs -> return (Some (con, Helper.as_phrase (Ast.Loop (Helper.to_stack_type ot, (List.rev instrs))), []))
       | None        -> return (Some (con, Helper.as_phrase (Ast.Loop (Helper.to_stack_type ot, [])), [])) )
