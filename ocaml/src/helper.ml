@@ -12,7 +12,7 @@ type globals_ = {
   g_im_f64: int list;
 }
 
-type value_type = I32Type | I64Type | F32Type | F64Type | IndexType | TableIndex of int
+type value_type = I32Type | I64Type | F32Type | F64Type | MemIndexType | TableIndex of int
 
 type funcs_ = {
   f_none: (int * value_type list) list;
@@ -23,17 +23,12 @@ type funcs_ = {
 }
 
 type context_ = {
-          (* (input, result) list *)
-  (*labels: (Types.value_type option * Types.stack_type) list;*)
   labels: (value_type option * value_type option) list;
-  (* funcs: (value_type list * value_type option) list; *)
   funcs: funcs_;
   imports: (value_type list * value_type option) list;
-  (* tables: (value_type option * Types.stack_type) list; *)
   mems: Int32.t Types.limits option;
   data: string Ast.segment list;
   tables: Int32.t Types.limits option;
-  (* elems: Ast.var list Ast.segment list; *)
   elems: ((value_type option * int) option) array option;
   locals: value_type list;
   globals: globals_;
@@ -46,7 +41,7 @@ let to_wasm_value_type = function
   | I64Type      -> Types.I64Type
   | F32Type      -> Types.F32Type
   | F64Type      -> Types.F64Type
-  | IndexType    -> Types.I32Type
+  | MemIndexType -> Types.I32Type
   | TableIndex _ -> Types.I32Type
 
 let rec to_stack_type = function
@@ -60,31 +55,6 @@ let string_to_name s =
 ;;
 
 let as_phrase x = {Source.at = Source.no_region; Source.it = x}
-;;
-
-let get_module types funcs memories globals data tables elems = {
-  Ast.types = types;
-  Ast.globals = globals;
-  Ast.tables = tables;
-  Ast.memories = memories;
-  Ast.funcs = funcs;
-  Ast.start = None(*None*)(*Some (as_phrase 1l)*);
-  Ast.elems  = elems;
-  Ast.data = data;
-  Ast.imports = [
-    as_phrase({
-      Ast.module_name = string_to_name "imports";
-      Ast.item_name = string_to_name "log";
-      Ast.idesc = as_phrase (Ast.FuncImport (as_phrase 0l))
-    })
-  ];
-  Ast.exports = [
-    as_phrase ({
-      Ast.name = string_to_name "aexp";
-      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 2l));
-    })
-  ];
-}
 ;;
 
 let types_ = [ 
@@ -142,7 +112,7 @@ let get_global_indexes t (l: globals_) m =
         )
       | None    -> l.g_im_f64
       )
-    | IndexType    -> []
+    | MemIndexType -> []
     | TableIndex _ -> []
 
 
@@ -153,7 +123,7 @@ let get_random_element a l =
     match snd element = a' with
       | true  -> (fst element)::(get_index a' l' (i+1))
       | false -> get_index a' l' (i+1) with Failure _ -> [] in
-  let type_list = get_index a l 0 in
+  let type_list = get_index a l 1 in
   match List.length type_list with
     | 0 -> None
     | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None
@@ -166,7 +136,7 @@ let get_indexes_and_inputs a l =
       | true  -> (i,(snd element))::(get_index_ot a' b' l' (i+1))
       | false -> get_index_ot a' b' l' (i+1) with Failure _ -> [] in
   match get_random_element a l with
-    | Some t -> get_index_ot a t l 0
+    | Some t -> get_index_ot a t l 1
     | None   -> []
 
 
@@ -240,74 +210,3 @@ let get_ftype con funci =
       )  
     ) 
   ) 
-
-  (* Array.fold_left 
-    (fun l (t, i) -> 
-      if t_opt = t 
-      then i::l
-      else l)
-    []
-    elems *)
-
-(*
-(** get_indexes: a' -> a list -> int list **)
-let get_indexes a l =
-  let rec get_index a' l' i = match List.nth_opt l' i with
-    | Some e  -> if a' = e then i::(get_index a' l' (i+1)) else get_index a' l' (i+1)
-    | None    -> [] in
-  get_index a l 0
-
-(** get_random_element: 'a -> ('a * 'b) list -> 'b **)
-let get_random_element a l =
-  let rec get_index a' l' i = match List.nth_opt l' i with
-    | Some (e, t)  -> if a' = t then e::(get_index a' l' (i+1)) else get_index a' l' (i+1)
-    | None       -> [] in
-  let type_list = get_index a l 0 in
-  match List.length type_list with
-    | 0 -> None
-    | n -> Some (List.nth type_list (Random.int n))
-
-(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
-let get_indexes_and_inputs a l =
-  let rec get_index_ot a' b' l' i = match List.nth_opt l' i with
-    | Some (e, t)  -> if a' = t && b' = e then (i,t)::(get_index_ot a' b' l' (i+1)) else get_index_ot a' b' l' (i+1)
-    | None       -> [] in
-  match get_random_element a l with
-    | Some t -> get_index_ot a t l 0
-    | None   -> []
-
-
-(** get_random_element: 'a -> ('a * 'b) list -> 'b **)
-let get_random_element2 a l index =
-  let rec get_index a' l' i = match i = index with
-    | true  -> get_index a' l' (i+1)
-    | false -> match List.nth_opt l' i with
-      | Some (e, t)  -> if a' = t then e::(get_index a' l' (i+1)) else get_index a' l' (i+1)
-      | None       -> [] in
-  let type_list = get_index a l 0 in
-  match List.length type_list with
-    | 0 -> None
-    | n -> Some (List.nth type_list (Random.int n))
-
-(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
-let get_indexes_and_inputs2 a l index =
-  let rec get_index_ot a' b' l' i = match List.nth_opt l' i with
-    | Some (e, t)  -> if a' = t && b' = e then (i,e)::(get_index_ot a' b' l' (i+1)) else get_index_ot a' b' l' (i+1)
-    | None       -> [] in
-  match get_random_element2 a l index with
-    | Some t -> get_index_ot a t l 0
-    | None   -> []
-*)
-
-(* 
-(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
-let get_indexes_and_inputs2 a l =
-  let ot = match a with
-    | Some e -> [e]
-    | None   -> [] in 
-    let rec get_index_ot a' b' l' i = match List.nth_opt l' i with
-      | Some (e, t)  -> if a' = t && b' = e then (i,t)::(get_index_ot a' b' l' (i+1)) else get_index_ot a' b' l' (i+1)
-      | None       -> [] in
-    match get_random_element a l with
-      | Some t -> get_index_ot a t l 0
-      | None   -> []*)

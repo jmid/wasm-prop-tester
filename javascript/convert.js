@@ -1,37 +1,69 @@
 const fs = require('fs');
 
-if (process.argv.length !== 3) {
-    console.log("missing filename argument");
-    process.exit(1);
+if (process.argv.length !== 4) {
+    throw "missing filename or javascript engine name argument";
 }
 
 const buf = fs.readFileSync(process.argv[2]);
 const b = new Uint8Array(buf);
 
-//"console = console || { log: (...args) => debug(Array.prototype.slice.call(args).join(' ')) };\n"
+const error_int_zero_div = 'integer division by zero';
+const error_overflow = 'integer overflow';
+const error_unreachable = 'unreachable';
+const error_stack = 'stack';
+const error_data_segment = 'data segment';
 
-const program = 
-    "var zero_div_re = /(divi.*zero)|(zero.*divi)/i;\n"
-    + "var zero_rem_re = /(rem.*zero)|(zero.*rem)/i;\n"
-    + "var overflow_re = /(overflow)/i;\n"
-    + "var out_of_bounds_re = /(out.of.bounds)/i;\n"
-    + "var unrepresentable_re = /(unrepresentable)/i;\n"
-    + "var debug = debug || (arg => console.log('-->', arg));\n"
-    + "var importObject = { imports: { log: function(arg) { debug(arg); } } };\n"
-    + "var buffer = new Uint8Array(\["
-    + b.toString()
-    + "]);\n"
-    + "try {\n"
-    + "     let m = new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject);\n"
-    + "     debug(m.exports.aexp(1,2));\n"
-    + "} catch(e) {\n"
-    + "     //if (zero_div_re.exec(e.message)) debug('integer divide by zero')\n"
-    + "     //else if (zero_rem_re.exec(e.message)) debug('integer divide by zero')\n"
-    + "     //else if (overflow_re.exec(e.message)) debug('integer overflow')\n"
-    + "     //else if (out_of_bounds_re.exec(e.message)) debug('integer overflow')\n"
-    + "     //else if (unrepresentable_re.exec(e.message)) debug('integer overflow')\n"
-    + "     //else debug(e.message)\n"
-    + "     debug(e)\n"
-    + "}"
+var program = ["var debug = debug || (arg => console.log('-->', arg));\n"];
+program.push("var unrepresentable_re = /(unrepresentable)/i;\n");
 
-console.log(program);
+switch(process.argv[3]) {
+    case "ch":
+        program.push("var zero_div_re = /(Division by zero)/i;\n");
+        program.push("var overflow_re = /(overflow)/i;\n");;
+        program.push("var unreachable_re = /(Unreachable Code)/i;\n");
+        program.push("var stack_re = /(Out of stack space)/i;\n")
+        program.push("var data_segment_re = /(Data segment is out of range)/i;\n");
+      break;
+    case "jsc":
+        program.push("var zero_div_re = /(Division by zero)/i;\n");
+        program.push("var overflow_re = /(Out of bounds)/i;\n");
+        program.push("var unreachable_re = /(Unreachable code should not be executed)/i;\n");
+        program.push("var stack_re = /(Maximum call stack size exceeded)/i;\n");
+        program.push("var data_segment_re = /(segment writes outside of memory)/i;\n");
+      break;
+    case "sm":
+        program.push("var zero_div_re = /(integer divide by zero)/i;\n");
+        program.push("var overflow_re = /(overflow)/i;\n");
+        program.push("var unreachable_re = /(unreachable executed)/i;\n");
+        program.push("var stack_re = /(too much recursion)/i;\n");
+        program.push("var data_segment_re = /(data segment does not fit in memory)/i;\n");
+        break;
+    case "v8":
+        program.push("var zero_div_re = /(by zero)/i;\n");
+        program.push("var overflow_re = /(float unrepresentable in integer range)/i;\n");
+        program.push("var unreachable_re = /(unreachable)/i;\n");
+        program.push("var stack_re = /(Maximum call stack size exceeded)/i;\n");
+        program.push("var data_segment_re = /(data segment is out of bounds)/i;\n");
+        break;
+  } 
+
+program.push("var importObject = { imports: { log: function(arg) { debug(arg); } } };\n");
+program.push("var buffer = new Uint8Array(\[");
+program.push(b.toString());
+program.push("]);\n");
+program.push("try {\n");
+program.push("     let m = new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject);\n");
+program.push("     debug(m.exports.runi32());\n");
+program.push("     debug(m.exports.runf32());\n");
+program.push("     debug(m.exports.runf64());\n");
+program.push("} catch(e) {\n");
+program.push("     if (zero_div_re.exec(e.message)) debug('" + error_int_zero_div + "')\n");
+program.push("     else if (unreachable_re.exec(e.message)) debug('" + error_unreachable + "')\n");
+program.push("     else if (stack_re.exec(e.message)) debug('" + error_stack + "')\n");
+program.push("     else if (overflow_re.exec(e.message)) debug('" + error_overflow + "')\n");
+program.push("     else if (unrepresentable_re.exec(e.message)) debug('" + error_overflow + "')\n");
+program.push("     else if (data_segment_re.exec(e.message)) debug('" + error_data_segment + "')\n");
+program.push("     else debug(e)\n");
+program.push("}");
+
+console.log(program.join(""));
