@@ -28,14 +28,14 @@ let get_func input ftype body =
 
 let module_to_wat m file =
   let m_sexpr = Arrange.module_ m
-  and oc = open_out file in
+  let oc = open_out file in
     Sexpr.output oc 80 m_sexpr;
     close_out oc
 ;;
 
 let module_to_wasm m file = 
   let s = Encode.encode (m)
-  and oc = open_out_bin file in
+  let oc = open_out_bin file in
   try
     output_string oc s;
     close_out oc
@@ -349,7 +349,7 @@ let rec rec_func_gen con res func_types index = Gen.(match func_types with
 
 let module_gen = Gen.(
   let intypes = [([I32Type], None); ([F32Type], None); ([F64Type], None)]
-  and outtypes = [([], None); ([], Some (I32Type)); ([], Some (F32Type)); ([], Some (F64Type))] in
+  let outtypes = [([], None); ([], Some (I32Type)); ([], Some (F32Type)); ([], Some (F64Type))] in
 
   oneofl [ None; Some (as_phrase 3l);] >>= fun start ->
 
