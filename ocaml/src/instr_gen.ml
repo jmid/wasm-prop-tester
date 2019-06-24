@@ -22,14 +22,14 @@ and instr' =
   | Block of stack_type * instr list  (* execute in sequence *)
   | Loop of stack_type * instr list   (* loop header *)
   | If of stack_type * instr list * instr list  (* conditional *)
-  | GetLocal of var                   (* read local variable *)
-  | SetLocal of var                   (* write local variable *)
-  | TeeLocal of var                   (* write local variable and keep value *)
+  | LocalGet of var                   (* read local variable *)
+  | LocalSet of var                   (* write local variable *)
+  | LocalTee of var                   (* write local variable and keep value *)
   | Br of var                         (* break to n-th surrounding label *)
   | BrIf of var                       (* conditional break *)
   | BrTable of var list * var         (* indexed break *)
-  | GetGlobal of var                  (* read global variable *)
-  | SetGlobal of var                  (* write global variable *)
+  | GlobalGet of var                  (* read global variable *)
+  | GlobalSet of var                  (* write global variable *)
   | Call of var                       (* call function *)
   | CallIndirect of var               (* call function through table *)
   | MemorySize                        (* size of linear memory *)
@@ -60,18 +60,18 @@ let rec instrs_rule context output_ts size =
 and instr_rule con t_opt size =
   let rules = match t_opt with
     | None   -> (match size with
-      | 0 -> [(1, nop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size);]
+      | 0 -> [(1, nop_gen con t_opt size); (1, localSet_gen con t_opt size); (1, globalSet_gen con t_opt size);]
       | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size);
-              (1, loop_gen con t_opt size); (1, setLocal_gen con t_opt size); (1, setGlobal_gen con t_opt size);
+              (1, loop_gen con t_opt size); (1, localSet_gen con t_opt size); (1, globalSet_gen con t_opt size);
               (1, call_gen con t_opt size); (1, store_gen con t_opt size); (1, store_gen con t_opt size);])
     | Some t -> (match size with
-      | 0 -> [(1, const_gen con t_opt size); (1, getLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);]
+      | 0 -> [(1, const_gen con t_opt size); (1, localGet_gen con t_opt size); (1, globalGet_gen con t_opt size);]
       | n -> (match t with
         | I32Type      -> [(1, const_gen con t_opt size); (1, unop_gen con t_opt size); (1, binop_gen con t_opt size);
                            (1, testop_gen con t_opt size); (1, relop_gen con t_opt size); (1, cvtop_gen con t_opt size);
                            (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
-                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (1, getLocal_gen con t_opt size);
-                           (1, teeLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);
+                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (1, localGet_gen con t_opt size);
+                           (1, localTee_gen con t_opt size); (1, globalGet_gen con t_opt size);
                            (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (1, br_gen con t_opt size);
                            (1, brif_gen con t_opt size); (1, brtable_gen con t_opt size);
                            (11, call_gen con t_opt size); (1, callindirect_gen con t_opt size);
@@ -80,8 +80,8 @@ and instr_rule con t_opt size =
                           [(1, const_gen con t_opt size); (1, unop_gen con t_opt size); (1, binop_gen con t_opt size);
                             (1, cvtop_gen con t_opt size);
                             (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
-                            (1, if_gen con t_opt size); (1, select_gen con t_opt size); (1, getLocal_gen con t_opt size);
-                            (1, teeLocal_gen con t_opt size); (1, getGlobal_gen con t_opt size);
+                            (1, if_gen con t_opt size); (1, select_gen con t_opt size); (1, localGet_gen con t_opt size);
+                            (1, localTee_gen con t_opt size); (1, globalGet_gen con t_opt size);
                             (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (1, br_gen con t_opt size);
                             (1, brif_gen con t_opt size); (1, brtable_gen con t_opt size);
                             (11, call_gen con t_opt size); (1, callindirect_gen con t_opt size);
@@ -322,60 +322,60 @@ and select_gen con t_opt size = match t_opt with
 
 (**** Variable Instructions ****)
 
-(*** GetLocal ***)
-(** getLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and getLocal_gen (con: context_) t_opt size = match t_opt with
+(*** LocalGet ***)
+(** localGet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and localGet_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (let locals = get_indexes t con.locals in
       match locals with
         | e::es -> Gen.( 
           map
-          (fun i -> (Some (con, as_phrase (Ast.GetLocal (as_phrase (Int32.of_int i))), [])))
+          (fun i -> (Some (con, as_phrase (Ast.LocalGet (as_phrase (Int32.of_int i))), [])))
           (oneofl locals))
         | []    -> Gen.return None )
   | None -> Gen.return None
 
-(*** SetLocal ***)
-(** setLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and setLocal_gen (con: context_) t_opt size = match t_opt with
+(*** LocalSet ***)
+(** localSet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and localSet_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> match List.length con.locals with
     | 0 -> Gen.return None
     | n -> Gen.( int_range 1 n >>= fun g ->
       let i = g - 1 in
       let t = List.nth con.locals i in
-        return (Some (con, as_phrase (Ast.SetLocal (as_phrase (Int32.of_int i))), [t])) )
+        return (Some (con, as_phrase (Ast.LocalSet (as_phrase (Int32.of_int i))), [t])) )
 
-(*** TeeLocal ***)
-(** teeLocal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and teeLocal_gen (con: context_) t_opt size = match t_opt with
+(*** LocalTee ***)
+(** localTee_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and localTee_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (let locals = get_indexes t con.locals in
       match locals with
         | e::es -> Gen.(map
-          (fun i -> (Some (con, as_phrase (Ast.TeeLocal (as_phrase (Int32.of_int i))), [t])))
+          (fun i -> (Some (con, as_phrase (Ast.LocalTee (as_phrase (Int32.of_int i))), [t])))
           (oneofl locals))
         | []    -> Gen.return None )
   | None -> Gen.return None
 
-(*** GetGlobal ***)
-(** getGlobal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and getGlobal_gen (con: context_) t_opt size = match t_opt with
+(*** GlobalGet ***)
+(** globalGet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and globalGet_gen (con: context_) t_opt size = match t_opt with
   | Some t -> (let globals = get_global_indexes t con.globals None in
     match globals with
       | e::es -> Gen.( map
-        (fun i -> (Some (con, as_phrase (Ast.GetGlobal (as_phrase (Int32.of_int i))), [])))
+        (fun i -> (Some (con, as_phrase (Ast.GlobalGet (as_phrase (Int32.of_int i))), [])))
         (oneofl globals))
       | []    -> Gen.return None )
   | None -> Gen.return None
 
-(*** SetGlobal ***)
-(** setGlobal_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and setGlobal_gen (con: context_) t_opt size = match t_opt with
+(*** GlobalSet ***)
+(** globalSet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and globalSet_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> Gen.( oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
               (let globals = get_global_indexes t con.globals (Some Types.Mutable) in
                 match globals with
                   | e::es -> Gen.(map
-                    (fun i -> (Some (con, as_phrase (Ast.SetGlobal (as_phrase (Int32.of_int i))), [t])))
+                    (fun i -> (Some (con, as_phrase (Ast.GlobalSet (as_phrase (Int32.of_int i))), [t])))
                     (oneofl globals))
                   | []    -> Gen.return None ))
 
