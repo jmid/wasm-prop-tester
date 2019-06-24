@@ -1,6 +1,15 @@
 # WebAssembly Property-Based Testing
 
+This project implements a generator of arbitrary WebAssembly programs
+for the purpose of property-based testing of different WebAssembly engines.
+
+The code piggybacks on the [WebAssembly reference interpreter's](https://github.com/WebAssembly/spec) 
+abstract syntax tree (in OCaml).
+
+
 ## External Dependencies
+
+* OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
 * WebAssembly reference interpreter, from spec: [WebAssembly spec](https://github.com/WebAssembly/spec)
 ```
