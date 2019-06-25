@@ -85,39 +85,25 @@ let mToString = function
     | Types.Immutable -> "Immutable")
 
 (** get_global_indexes: a' -> a list -> int list **)
-let get_global_indexes t (l: globals_) m =
-  match t with 
-    | I32Type -> (match m with
-      | Some m' -> (match m' with 
-          | Types.Mutable   -> l.g_m_i32
-          | Types.Immutable -> l.g_im_i32
-        )
-      | None    -> l.g_im_i32
-      )
-    | I64Type -> (match m with
-      | Some m' -> (match m' with 
-          | Types.Mutable   -> l.g_m_i64
-          | Types.Immutable -> l.g_im_i64
-        )
-      | None    -> l.g_im_i64
-      )
-    | F32Type -> (match m with
-      | Some m' -> (match m' with 
-          | Types.Mutable   -> l.g_m_f32
-          | Types.Immutable -> l.g_im_f32
-        )
-      | None    -> l.g_im_f32
-      )
-    | F64Type ->  (match m with
-      | Some m' -> (match m' with 
-          | Types.Mutable   -> l.g_m_f64
-          | Types.Immutable -> l.g_im_f64
-        )
-      | None    -> l.g_im_f64
-      )
-    | MemIndexType -> []
-    | TableIndex _ -> []
-
+let get_global_indexes t (l: globals_) m = match t with 
+  | MemIndexType -> []
+  | TableIndex _ -> []
+  | I32Type -> (match m with
+      | Some Types.Mutable   -> l.g_m_i32
+      | Some Types.Immutable -> l.g_im_i32
+      | None                 -> l.g_im_i32)
+  | I64Type -> (match m with
+      | Some Types.Mutable   -> l.g_m_i64
+      | Some Types.Immutable -> l.g_im_i64
+      | None                 -> l.g_im_i64)
+  | F32Type -> (match m with
+      | Some Types.Mutable   -> l.g_m_f32
+      | Some Types.Immutable -> l.g_im_f32
+      | None                 -> l.g_im_f32)
+  | F64Type ->  (match m with
+      | Some Types.Mutable   -> l.g_m_f64
+      | Some Types.Immutable -> l.g_im_f64
+      | None                 -> l.g_im_f64)
 
 (** get_random_element: 'a -> ('b * 'a) list -> 'b option **)
 let get_random_element a l =
