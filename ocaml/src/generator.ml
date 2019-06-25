@@ -13,11 +13,9 @@ let wat_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wat";;
 let wasm_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wasm";;
 
 let get_func input ftype body =
-  {
-    Ast.ftype = ftype;
+  { Ast.ftype  = ftype;
     Ast.locals = input;
-    Ast.body = body;
-  }
+    Ast.body   = body; }
 ;;
 
 let module_to_wat m file =
@@ -40,28 +38,28 @@ let context = {
   labels = [];
   locals = [];
   globals = {
-    g_m_i32 = [];
+    g_m_i32  = [];
     g_im_i32 = [];
-    g_m_i64 = [];
+    g_m_i64  = [];
     g_im_i64 = [];
-    g_m_f32 = [];
+    g_m_f32  = [];
     g_im_f32 = [];
-    g_m_f64 = [];
+    g_m_f64  = [];
     g_im_f64 = [];
   };
   funcs = {
     f_none = [];
-    f_i32 = [(0, [])];
-    f_i64 = [];
-    f_f32 = [];
-    f_f64 = [];
+    f_i32  = [(0, [])];
+    f_i64  = [];
+    f_f32  = [];
+    f_f64  = [];
   };
   imports = [];
-  mems = None;
-  data = [];
-  return = None;
-  tables = None;
-  elems = None;
+  mems    = None;
+  data    = [];
+  return  = None;
+  tables  = None;
+  elems   = None;
   funcindex = 0;
 }
 ;;
@@ -211,8 +209,9 @@ let globals_gen con =
     rec_glob_gen con triples tlist >>= fun globals -> return globals
   )
 
-let triple_to_global = function (t, m, inst) ->
-  (as_phrase ({ Ast.gtype = Types.GlobalType (to_wasm_value_type (t), m); Ast.value = as_phrase [inst] }))
+let triple_to_global (t,m,inst) =
+  as_phrase { Ast.gtype = Types.GlobalType (to_wasm_value_type t, m);
+              Ast.value = as_phrase [inst] }
 
 exception Type_not_expected of string;;
 
@@ -220,7 +219,7 @@ let process_globals con gtypelist =
   let rec rec_glob_process globals glist index =
     match glist with
       | g::rst ->
-        let nglobals = function (t, m, inst) ->
+        let nglobals (t, m, inst) =
           (match t with
             | I32Type -> (match m with 
               | Types.Mutable   -> { globals with g_m_i32  = index::globals.g_m_i32; }
@@ -254,13 +253,13 @@ let context_gen =
       labels = [];
       locals = [];
       globals = {
-        g_m_i32 = [];
+        g_m_i32  = [];
         g_im_i32 = [];
-        g_m_i64 = [];
+        g_m_i64  = [];
         g_im_i64 = [];
-        g_m_f32 = [];
+        g_m_f32  = [];
         g_im_f32 = [];
-        g_m_f64 = [];
+        g_m_f64  = [];
         g_im_f64 = [];
       };
       funcs = {
