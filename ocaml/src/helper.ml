@@ -107,12 +107,13 @@ let get_global_indexes t (l: globals_) m = match t with
 
 (** get_random_element: 'a -> ('b * 'a) list -> 'b option **)
 let get_random_element a l =
-  let rec get_index a' l' i = try
-    let element = List.nth l' i in
-    match snd element = a' with
-      | true  -> (fst element)::(get_index a' l' (i+1))
-      | false -> get_index a' l' (i+1) with Failure _ -> [] in
-  let type_list = get_index a l 1 in
+  let rec get_index a' l' = match l' with
+    | [] -> []
+    | (fst,snd)::es ->
+      if snd = a'
+      then fst::(get_index a' es)
+      else get_index a' es in
+  let type_list = get_index a l in
   match List.length type_list with
     | 0 -> None
     | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None
