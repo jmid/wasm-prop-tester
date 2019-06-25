@@ -138,12 +138,12 @@ and const_gen con t_opt size = match t_opt with
   | Some F32Type -> Gen.(
     let corner_gen = 
       map
-      (fun s -> F32.of_string s)
+      F32.of_string
       (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126"; "-0x1p-126";
                 "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127"; "-0x1.fffffep+127"]) in
     let f32 = 
       map
-      (fun f -> F32.of_float f)
+      F32.of_float
       float
     in
       map
@@ -153,14 +153,11 @@ and const_gen con t_opt size = match t_opt with
   | Some F64Type -> Gen.(
     let corner_gen = 
       map
-      (fun s -> F64.of_string s)
+      F64.of_string
       (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1"; "-0x1p-1";
                 "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022"; "0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2"; 
                 "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"]) in
-    let f64 = 
-      map
-      (fun f -> F64.of_float f)
-      float
+    let f64 = map F64.of_float float
     in
       map
       (fun f -> Some (con, as_phrase (Ast.Const (as_phrase (Values.F64 f))), []))
@@ -178,7 +175,7 @@ and const_gen con t_opt size = match t_opt with
       )
     | None     -> Gen.return None)
   | Some TableIndex i  -> Gen.return (Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))), []))
-  | None                      -> Gen.return None
+  | None               -> Gen.return None
 
 (*** Unary operations ***)
 (** intOp_unop_gen : IntOp.unop Gen.t **)
@@ -234,8 +231,8 @@ and binop_gen con t_opt size = match t_opt with
 (*** Test operations ***)
 (** testop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and testop_gen con t_opt size = match t_opt with
-  | Some I32Type -> Gen.( oneof [ return (Some (con, as_phrase (Ast.Test (Values.I32 Ast.IntOp.Eqz)), [I32Type;]));
-                                  return (Some (con, as_phrase (Ast.Test (Values.I64 Ast.IntOp.Eqz)), [I64Type;])); ] )
+  | Some I32Type -> Gen.oneofl [ Some (con, as_phrase (Ast.Test (Values.I32 Ast.IntOp.Eqz)), [I32Type;]);
+                                 Some (con, as_phrase (Ast.Test (Values.I64 Ast.IntOp.Eqz)), [I64Type;]); ]
   | Some _ | None -> Gen.return None
 
 (*** Compare operations ***)
@@ -250,49 +247,49 @@ and floatOp_relop_gen = Gen.oneofl
 (** relop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and relop_gen con t_opt size = match t_opt with
   | Some I32Type -> Gen.(oneof [
-    (intOp_relop_gen >>= fun op -> oneofl [ (Some (con, as_phrase (Ast.Compare (Values.I32 op)), [I32Type; I32Type]));
-                                            (Some (con, as_phrase (Ast.Compare (Values.I64 op)), [I64Type; I64Type])) ]);
-    (floatOp_relop_gen >>= fun op -> oneofl [ (Some (con, as_phrase (Ast.Compare (Values.F32 op)), [F32Type; F32Type]));
-                                              (Some (con, as_phrase (Ast.Compare (Values.F64 op)), [F64Type; F64Type])) ]); ])
+    (intOp_relop_gen >>= fun op -> oneofl [ Some (con, as_phrase (Ast.Compare (Values.I32 op)), [I32Type; I32Type]);
+                                            Some (con, as_phrase (Ast.Compare (Values.I64 op)), [I64Type; I64Type]) ]);
+    (floatOp_relop_gen >>= fun op -> oneofl [ Some (con, as_phrase (Ast.Compare (Values.F32 op)), [F32Type; F32Type]);
+                                              Some (con, as_phrase (Ast.Compare (Values.F64 op)), [F64Type; F64Type]) ]); ])
   | Some _ | None -> Gen.return None
 
 (*** Convert operations ***)
 (** int32Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and int32Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.WrapI64)),   [I64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF32)), [F32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF32)), [F32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF64)), [F64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF64)), [F64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.ReinterpretFloat)), [F32Type])); ]
+  [ Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.WrapI64)),   [I64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF32)), [F32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF32)), [F32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncSF64)), [F64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.TruncUF64)), [F64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I32 Ast.IntOp.ReinterpretFloat)), [F32Type]); ]
 
 (** int64Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and int64Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendSI32)), [I32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendUI32)), [I32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF32)),  [F32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF32)),  [F32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF64)),  [F64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF64)),  [F64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ReinterpretFloat)), [F64Type])); ]
+  [ Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendSI32)), [I32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ExtendUI32)), [I32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF32)),  [F32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF32)),  [F32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncSF64)),  [F64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.TruncUF64)),  [F64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.I64 Ast.IntOp.ReinterpretFloat)), [F64Type]); ]
 
 (** float32Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and float32Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI32)), [I32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI32)), [I32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI64)), [I64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI64)), [I64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.DemoteF64)), [F64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [I32Type])); ]
+  [ Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI32)), [I32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI32)), [I32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertSI64)), [I64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ConvertUI64)), [I64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.DemoteF64)),   [F64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F32 Ast.FloatOp.ReinterpretInt)), [I32Type]); ]
 
 (** float64Op_cvtop_gen : context_ -> (context_ * instr * value_type list) option Gen.t **)
 and float64Op_cvtop_gen con = Gen.oneofl
-  [ (Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI32)), [I32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI32)), [I32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI64)), [I64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI64)), [I64Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.PromoteF32)), [F32Type]));
-    (Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ReinterpretInt)), [I64Type])); ]
+  [ Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI32)), [I32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI32)), [I32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertSI64)), [I64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ConvertUI64)), [I64Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.PromoteF32)),  [F32Type]);
+    Some (con, as_phrase (Ast.Convert (Values.F64 Ast.FloatOp.ReinterpretInt)), [I64Type]); ]
 
 (** cvtop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and cvtop_gen con t_opt size = match t_opt with
@@ -309,7 +306,7 @@ and cvtop_gen con t_opt size = match t_opt with
 and drop_gen con t_opt size = match t_opt with
 | Some _ -> Gen.return None
 | None   -> Gen.(map
-  (fun t -> (Some (con, as_phrase (Ast.Drop), [t])))
+  (fun t -> Some (con, as_phrase (Ast.Drop), [t]))
   (oneofl [I32Type; I64Type; F32Type; F64Type]))
 
 (*** Select ***)
@@ -323,7 +320,8 @@ and select_gen con t_opt size = match t_opt with
 (*** LocalGet ***)
 (** localGet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and localGet_gen (con: context_) t_opt size = match t_opt with
-  | Some t -> (let locals = get_indexes t con.locals in
+  | Some t ->
+    (let locals = get_indexes t con.locals in
       match locals with
         | e::es -> Gen.( 
           map
@@ -346,7 +344,8 @@ and localSet_gen (con: context_) t_opt size = match t_opt with
 (*** LocalTee ***)
 (** localTee_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and localTee_gen (con: context_) t_opt size = match t_opt with
-  | Some t -> (let locals = get_indexes t con.locals in
+  | Some t ->
+    (let locals = get_indexes t con.locals in
       match locals with
         | e::es -> Gen.(map
           (fun i -> (Some (con, as_phrase (Ast.LocalTee (as_phrase (Int32.of_int i))), [t])))
@@ -357,7 +356,8 @@ and localTee_gen (con: context_) t_opt size = match t_opt with
 (*** GlobalGet ***)
 (** globalGet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and globalGet_gen (con: context_) t_opt size = match t_opt with
-  | Some t -> (let globals = get_global_indexes t con.globals None in
+  | Some t ->
+    (let globals = get_global_indexes t con.globals None in
     match globals with
       | e::es -> Gen.( map
         (fun i -> (Some (con, as_phrase (Ast.GlobalGet (as_phrase (Int32.of_int i))), [])))
