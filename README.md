@@ -9,6 +9,8 @@ abstract syntax tree (in OCaml).
 
 ## External Dependencies
 
+* A `timeout` command
+
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
 * WebAssembly reference interpreter, from spec: [WebAssembly spec](https://github.com/WebAssembly/spec)
