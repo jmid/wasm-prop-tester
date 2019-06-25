@@ -13,42 +13,42 @@ const error_unreachable = 'unreachable';
 const error_stack = 'stack';
 const error_data_segment = 'data segment';
 
-var program = ["var debug = debug || (arg => console.log('-->', arg));\n"];
-program.push("var unrepresentable_re = /(unrepresentable)/i;\n");
+let program = ["let debug = debug || (arg => console.log('-->', arg));\n"];
+program.push("let unrepresentable_re = /(unrepresentable)/i;\n");
 
 switch(process.argv[3]) {
     case "ch":
-        program.push("var zero_div_re = /(Division by zero)/i;\n");
-        program.push("var overflow_re = /(overflow)/i;\n");;
-        program.push("var unreachable_re = /(Unreachable Code)/i;\n");
-        program.push("var stack_re = /(Out of stack space)/i;\n")
-        program.push("var data_segment_re = /(Data segment is out of range)/i;\n");
+        program.push("let zero_div_re = /(Division by zero)/i;\n");
+        program.push("let overflow_re = /(overflow)/i;\n");;
+        program.push("let unreachable_re = /(Unreachable Code)/i;\n");
+        program.push("let stack_re = /(Out of stack space)/i;\n")
+        program.push("let data_segment_re = /(Data segment is out of range)/i;\n");
       break;
     case "jsc":
-        program.push("var zero_div_re = /(Division by zero)/i;\n");
-        program.push("var overflow_re = /(Out of bounds)/i;\n");
-        program.push("var unreachable_re = /(Unreachable code should not be executed)/i;\n");
-        program.push("var stack_re = /(Maximum call stack size exceeded)/i;\n");
-        program.push("var data_segment_re = /(segment writes outside of memory)/i;\n");
+        program.push("let zero_div_re = /(Division by zero)/i;\n");
+        program.push("let overflow_re = /(Out of bounds)/i;\n");
+        program.push("let unreachable_re = /(Unreachable code should not be executed)/i;\n");
+        program.push("let stack_re = /(Maximum call stack size exceeded)/i;\n");
+        program.push("let data_segment_re = /(segment writes outside of memory)/i;\n");
       break;
     case "sm":
-        program.push("var zero_div_re = /(integer divide by zero)/i;\n");
-        program.push("var overflow_re = /(overflow)/i;\n");
-        program.push("var unreachable_re = /(unreachable executed)/i;\n");
-        program.push("var stack_re = /(too much recursion)/i;\n");
-        program.push("var data_segment_re = /(data segment does not fit in memory)/i;\n");
+        program.push("let zero_div_re = /(integer divide by zero)/i;\n");
+        program.push("let overflow_re = /(overflow)/i;\n");
+        program.push("let unreachable_re = /(unreachable executed)/i;\n");
+        program.push("let stack_re = /(too much recursion)/i;\n");
+        program.push("let data_segment_re = /(data segment does not fit in memory)/i;\n");
         break;
     case "v8":
-        program.push("var zero_div_re = /(by zero)/i;\n");
-        program.push("var overflow_re = /(float unrepresentable in integer range)/i;\n");
-        program.push("var unreachable_re = /(unreachable)/i;\n");
-        program.push("var stack_re = /(Maximum call stack size exceeded)/i;\n");
-        program.push("var data_segment_re = /(data segment is out of bounds)/i;\n");
+        program.push("let zero_div_re = /(by zero)/i;\n");
+        program.push("let overflow_re = /(float unrepresentable in integer range)/i;\n");
+        program.push("let unreachable_re = /(unreachable)/i;\n");
+        program.push("let stack_re = /(Maximum call stack size exceeded)/i;\n");
+        program.push("let data_segment_re = /(data segment is out of bounds)/i;\n");
         break;
   } 
 
-program.push("var importObject = { imports: { log: function(arg) { debug(arg); } } };\n");
-program.push("var buffer = new Uint8Array(\[");
+program.push("let importObject = { imports: { log: debug } };\n");
+program.push("let buffer = new Uint8Array(\[");
 program.push(b.toString());
 program.push("]);\n");
 program.push("try {\n");
