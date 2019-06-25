@@ -117,21 +117,19 @@ and generate_rule rules =
 (** const_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and const_gen con t_opt size = match t_opt with
   | Some I32Type -> Gen.(
-    let corner_gen = map
-      (fun s -> Int32.of_string s)
-      (oneofl [ "0x7fffffff"; "0x80000000"; "0x80000001"; "0x00000000"; "0x3fffffff"; "0x01234567"; "0x8ff00ff0";
-                "0x40000000"; "0xabcd9876"; "0xfe00dc00"; "0xb0c1d2e3"; "0x769abcdf"])
+    let corner_gen =
+      (oneofl [ 0x7fffffffl; 0x80000000l; 0x80000001l; 0x00000000l; 0x3fffffffl; 0x01234567l; 0x8ff00ff0l;
+                0x40000000l; 0xabcd9876l; 0xfe00dc00l; 0xb0c1d2e3l; 0x769abcdfl])
     in
       map
       (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 i))), []))
       (frequency [ 11, corner_gen; 2, ui32; ])
     )
   | Some I64Type -> Gen.(
-    let corner_gen = map
-      (fun s -> Int64.of_string s)
-      (oneofl [ (*"0x7fffffffffffffff";*) "0x8000000000000000"; "0x3fffffff"; "0x0123456789abcdef"; "0x8ff00ff00ff00ff0";
-                "0xf0f0ffff"; "0x4000000000000000"; "0xabcd1234ef567809"; "0xabd1234ef567809c"; "0xabcd987602468ace"; "0xfe000000dc000000"; "0x00008000";
-                "0x00010000"; "0xAAAAAAAA55555555"; "0x99999999AAAAAAAA"; "0xDEADBEEFDEADBEEF"])
+    let corner_gen =
+      (oneofl [ (*0x7fffffffffffffffL;*) 0x8000000000000000L; 0x3fffffffL; 0x0123456789abcdefL; 0x8ff00ff00ff00ff0L;
+                0xf0f0ffffL; 0x4000000000000000L; 0xabcd1234ef567809L; 0xabd1234ef567809cL; 0xabcd987602468aceL; 0xfe000000dc000000L; 0x00008000L;
+                0x00010000L; 0xAAAAAAAA55555555L; 0x99999999AAAAAAAAL; 0xDEADBEEFDEADBEEFL])
     in
       map
       (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I64 i))), []))
