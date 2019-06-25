@@ -567,10 +567,9 @@ and brtable_gen (con: context_) t_opt size =
 (*** Return ***)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and return_gen (con: context_) t_opt size =
-  let tlist = try match con.return with
+  let tlist = match con.return with
     | Some t -> [t]
-    | None   -> []
-  with Failure _ -> [] in
+    | None   -> [] in
   Gen.return (Some (con, as_phrase Ast.Return, tlist))
 
 (*** Call ***)
