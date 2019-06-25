@@ -52,7 +52,7 @@ let rec instrs_rule context output_ts size =
             let empty_gen = recgen context None [] in
               Gen.(oneof [ empty_gen; return (Some []) ])
           | t1::trst  ->
-            let empty_gen = recgen context None output_ts
+            let empty_gen = recgen context None output_ts in
             let non_empty_gen = recgen context (Some t1) trst in
               Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])
 
@@ -142,7 +142,7 @@ and const_gen con t_opt size = match t_opt with
       map
       (fun s -> F32.of_string s)
       (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126"; "-0x1p-126";
-                "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127"; "-0x1.fffffep+127"])
+                "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127"; "-0x1.fffffep+127"]) in
     let f32 = 
       map
       (fun f -> F32.of_float f)
@@ -158,7 +158,7 @@ and const_gen con t_opt size = match t_opt with
       (fun s -> F64.of_string s)
       (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1"; "-0x1p-1";
                 "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022"; "0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2"; 
-                "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"])
+                "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"]) in
     let f64 = 
       map
       (fun f -> F64.of_float f)
@@ -502,7 +502,7 @@ and if_gen (con: context_) t_opt size =
       fun (instrs_opt1, instrs_opt2) ->
         let instrs1 = match instrs_opt1 with
           | Some instrs -> instrs
-          | None        -> []
+          | None        -> [] in
         let instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
