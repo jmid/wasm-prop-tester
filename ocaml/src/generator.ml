@@ -135,7 +135,7 @@ let limits_to_ast_table = function
   | None   -> []
   | Some l ->
     let table = {
-      Ast.ttype = Types.TableType (l, Types.AnyFuncType)
+      Ast.ttype = Types.TableType (l, Types.FuncRefType(*Types.AnyFuncType*))
     } in
     [as_phrase table]
 
@@ -544,7 +544,7 @@ let buffer_test =
       { Ast.empty_module with
       Ast.types = (func_type_list_to_type_phrase ([([I32Type], None);([I32Type], None);([], Some (I32Type))]));
       Ast.funcs = [as_phrase (get_func [] (as_phrase 1l) [
-        (as_phrase (Ast.GetLocal (as_phrase 0l)));
+        (as_phrase (Ast.LocalGet (as_phrase 0l)));
         (as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))));
         (as_phrase (Ast.Compare (Values.I32 (Ast.IntOp.Eq))));
         (as_phrase (Ast.If ([], (
@@ -555,7 +555,7 @@ let buffer_test =
           [
             (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
             (as_phrase (Ast.Call (as_phrase 0l)));
-            (as_phrase (Ast.GetLocal (as_phrase 0l)));
+            (as_phrase (Ast.LocalGet (as_phrase 0l)));
             (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
             (as_phrase (Ast.Binary (Values.I32 (Ast.IntOp.Add))));
             (as_phrase (Ast.Call (as_phrase 1l)));
