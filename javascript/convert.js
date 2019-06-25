@@ -1,7 +1,9 @@
 const fs = require('fs');
 
 if (process.argv.length !== 4) {
-    throw "missing filename or javascript engine name argument";
+    console.log("Missing filename or javascript engine name argument");
+    console.log("Usage: node convert.js filename enginename");
+    process.exit(1);
 }
 
 const buf = fs.readFileSync(process.argv[2]);
