@@ -120,7 +120,12 @@ let get_random_element a l =
 
 (** get_indexes_and_inputs: a' -> ('b * 'a) list -> (int * stack_type) list **)
 let get_indexes_and_inputs a l =
-  let rec get_index_ot a' b' l' i =
+  let rec get_index_ot a' b' l' i = (*match l' with
+    | [] -> []
+    | (fst,snd)::es ->
+      if snd = a' && fst = b'
+      then (i,snd)::(get_index_ot a' b' es (i+1))
+      else           get_index_ot a' b' es (i+1) in *)
     try
       let (fst,snd) = List.nth l' i in
       if snd = a' && fst = b'
@@ -131,20 +136,24 @@ let get_indexes_and_inputs a l =
   | Some t -> get_index_ot a t l 1
   | None   -> []
 
-(** get_random_global: 'a -> ('a * 'b) list -> int -> 'b **)
+(*
+(** get_random_global: 'a -> ('a * 'b) list -> int -> (int * 'b) option **)
 let get_random_global a l index =
   let rec get_index a' l' i = 
-    match i = index with
-      | true  -> get_index a' l' (i+1)
-      | false -> (try
-        let element = List.nth l' i in
-        match snd element = a' with
-          | true  -> (i,(fst element))::(get_index a' l' (i+1))
-          | false -> get_index a' l' (i+1) with Failure _ -> []) in
+    if i = index
+    then get_index a' l' (i+1)
+    else
+      try
+        let (fst,snd) = List.nth l' i in
+        if snd = a'
+        then (i,fst)::(get_index a' l' (i+1))
+        else get_index a' l' (i+1)
+      with Failure _ -> [] in
   let type_list = get_index a l 0 in
   match List.length type_list with
     | 0 -> None
     | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None     
+*)
 
 let get_findex t_opt elems = 
   let rec indices il eindex =

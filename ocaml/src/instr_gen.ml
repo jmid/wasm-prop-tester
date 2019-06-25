@@ -335,9 +335,9 @@ and localGet_gen (con: context_) t_opt size = match t_opt with
   | None -> Gen.return None
   | Some t ->
     let locals = get_indexes t con.locals in
-    match locals with
-    | []    -> Gen.return None
-    | e::es ->
+    if locals = []
+    then Gen.return None
+    else
       Gen.(map
              (fun i -> Some (con, as_phrase (Ast.LocalGet (as_phrase (Int32.of_int i))), []))
              (oneofl locals))
@@ -360,9 +360,9 @@ and localTee_gen (con: context_) t_opt size = match t_opt with
   | None -> Gen.return None
   | Some t ->
     let locals = get_indexes t con.locals in
-    match locals with
-    | []    -> Gen.return None
-    | e::es ->
+    if locals = []
+    then Gen.return None
+    else
       Gen.(map
              (fun i -> Some (con, as_phrase (Ast.LocalTee (as_phrase (Int32.of_int i))), [t]))
              (oneofl locals))
@@ -373,9 +373,9 @@ and globalGet_gen (con: context_) t_opt size = match t_opt with
   | None -> Gen.return None
   | Some t ->
     let globals = get_global_indexes t con.globals None in
-    match globals with
-    | []    -> Gen.return None
-    | e::es ->
+    if globals = []
+    then Gen.return None
+    else
       Gen.(map
              (fun i -> Some (con, as_phrase (Ast.GlobalGet (as_phrase (Int32.of_int i))), []))
              (oneofl globals))
@@ -387,9 +387,9 @@ and globalSet_gen (con: context_) t_opt size = match t_opt with
   | None ->
     Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
          let globals = get_global_indexes t con.globals (Some Types.Mutable) in
-         match globals with
-         | []    -> Gen.return None
-         | e::es ->
+         if globals = []
+         then Gen.return None
+         else
            Gen.(map
                   (fun i -> Some (con, as_phrase (Ast.GlobalSet (as_phrase (Int32.of_int i))), [t]))
                   (oneofl globals)))
