@@ -526,10 +526,11 @@ and if_gen (con: context_) t_opt size =
 (*** Br ***)
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and br_gen (con: context_) t_opt size =
-  match get_indexes_and_inputs t_opt con.labels with
-  | []    -> Gen.return None
-  | e::es ->
-    Gen.(oneofl (e::es) >>= fun (i,it_opt) ->
+  let labels = get_indexes_and_inputs t_opt con.labels in
+  if labels = []
+  then Gen.return None
+  else
+    Gen.(oneofl labels >>= fun (i,it_opt) ->
          let it = match it_opt with
            | Some t -> [t]
            | None   -> [] in
@@ -539,9 +540,9 @@ and br_gen (con: context_) t_opt size =
 (** brif_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brif_gen (con: context_) t_opt size =
   let labels = get_indexes_and_inputs t_opt con.labels in
-  match labels with
-  | []    -> Gen.return None
-  | e::es ->
+  if labels = []
+  then Gen.return None
+  else
     Gen.(oneofl labels >>= fun (i,it_opt) ->
          let it = match it_opt with
            | Some t -> [t]
@@ -552,9 +553,9 @@ and brif_gen (con: context_) t_opt size =
 (** brtable_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brtable_gen (con: context_) t_opt size =
   let labels = get_indexes_and_inputs t_opt con.labels in
-  match labels with
-  | []    -> Gen.return None
-  | e::es ->
+  if labels = []
+  then Gen.return None
+  else
     Gen.(oneofl labels >>= fun (i,it_opt) ->
          let it = match it_opt with
            | Some t -> [t]
@@ -604,12 +605,14 @@ and callindirect_gen (con: context_) t_opt size =
       let ilist = get_findex t_opt a in
       if ilist = []
       then Gen.return None
-      else Gen.( oneofl ilist >>= fun e ->
-        let ftype_opt = get_ftype con (snd e) in
+      else Gen.( oneofl ilist >>= fun (idx,i) ->
+        let ftype_opt = get_ftype con i in
           match ftype_opt with
             | None       -> return None
             | Some ftype ->
-              return (Some (con, as_phrase (Ast.CallIndirect (as_phrase (Int32.of_int (snd e)))), (TableIndex (fst e))::(List.rev (fst ftype))))
+              return (Some (con,
+                            as_phrase (Ast.CallIndirect (as_phrase (Int32.of_int i))),
+                            (TableIndex idx)::(List.rev (fst ftype))))
       )
 
 let instr_gen context types = Gen.sized (instrs_rule context (snd types))

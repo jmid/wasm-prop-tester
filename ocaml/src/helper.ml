@@ -120,14 +120,16 @@ let get_random_element a l =
 
 (** get_indexes_and_inputs: a' -> ('b * 'a) list -> (int * stack_type) list **)
 let get_indexes_and_inputs a l =
-  let rec get_index_ot a' b' l' i = try
-    let element = List.nth l' i in
-    match snd element = a' && fst element = b' with
-      | true  -> (i,(snd element))::(get_index_ot a' b' l' (i+1))
-      | false -> get_index_ot a' b' l' (i+1) with Failure _ -> [] in
+  let rec get_index_ot a' b' l' i =
+    try
+      let (fst,snd) = List.nth l' i in
+      if snd = a' && fst = b'
+      then (i,snd)::(get_index_ot a' b' l' (i+1))
+      else get_index_ot a' b' l' (i+1)
+    with Failure _ -> [] in
   match get_random_element a l with
-    | Some t -> get_index_ot a t l 1
-    | None   -> []
+  | Some t -> get_index_ot a t l 1
+  | None   -> []
 
 (** get_random_global: 'a -> ('a * 'b) list -> int -> 'b **)
 let get_random_global a l index =
@@ -151,10 +153,10 @@ let get_findex t_opt elems =
       let il' =
         match elem with 
           | None    -> il
-          | Some e  ->
-            (if (fst e) = t_opt
-            then (eindex, snd e)::il
-            else il)
+          | Some (fst,snd) ->
+            if fst = t_opt
+            then (eindex, snd)::il
+            else il
       in
       indices il' (eindex + 1)
     with Invalid_argument _ -> il
@@ -162,40 +164,29 @@ let get_findex t_opt elems =
   indices [] 0
 
 let get_ftype con funci =
-  let rec find_findex flist t funci =
-    match flist with 
-      | []      -> None
-      | e::rst  -> 
-        if fst e = funci
-        then Some (snd e, t)
-        else find_findex rst t funci
-  in
-  let ftype = find_findex con.funcs.f_none None funci
-  in
+  let rec find_findex flist t funci = match flist with
+    | [] -> None
+    | (fst,snd)::rst ->
+      if fst = funci
+      then Some (snd, t)
+      else find_findex rst t funci in
+  let ftype = find_findex con.funcs.f_none None funci in
   if ftype <> None
   then ftype
-  else (
-    let ftype = find_findex con.funcs.f_i32 (Some I32Type) funci
-    in
+  else
+    let ftype = find_findex con.funcs.f_i32 (Some I32Type) funci in
     if ftype <> None
     then ftype 
-    else (
-      let ftype = find_findex con.funcs.f_i64 (Some I64Type) funci
-      in
+    else
+      let ftype = find_findex con.funcs.f_i64 (Some I64Type) funci in
       if ftype <> None
       then ftype 
-      else (
-        let ftype = find_findex con.funcs.f_f32 (Some F32Type) funci
-        in
+      else
+        let ftype = find_findex con.funcs.f_f32 (Some F32Type) funci in
         if ftype <> None
         then ftype 
-        else (
-          let ftype = find_findex con.funcs.f_f64 (Some F64Type) funci
-          in
+        else
+          (*let ftype =*)find_findex con.funcs.f_f64 (Some F64Type) funci(* in
           if ftype <> None
-          then ftype 
-          else None
-        )
-      )  
-    ) 
-  ) 
+          then ftype
+          else None*)
