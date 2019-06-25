@@ -443,7 +443,7 @@ let rec call_number il s = match il with
   | []      -> s
 
 let calls_number (m: Ast.module_) = 
-    List.fold_left (fun s (f: Ast.func) -> s + (call_number f.it.body 0)) 0 m.it.funcs
+  List.fold_left (fun s (f: Ast.func) -> s + (call_number f.it.body 0)) 0 m.it.funcs
 
 let rec callIndirect_number il s = match il with
   | (e: Ast.instr)::rst  -> (match e.it with
@@ -453,7 +453,7 @@ let rec callIndirect_number il s = match il with
   | []      -> s
 
 let callIndirects_number (m: Ast.module_) = 
-    List.fold_left (fun s (f: Ast.func) -> s + (callIndirect_number f.it.body 0)) 0 m.it.funcs
+  List.fold_left (fun s (f: Ast.func) -> s + (callIndirect_number f.it.body 0)) 0 m.it.funcs
     
   
 

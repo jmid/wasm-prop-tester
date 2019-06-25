@@ -41,20 +41,20 @@ and instr' =
 (*** Instructions list generator ***)
 (** instrs_rule : context_ -> value_type list -> value_type list -> int -> (instr list) option Gen.t **)
 let rec instrs_rule context output_ts size =
-    let recgen con t_opt tr = Gen.(instr_rule con t_opt (size/2) >>= function
-          | None              -> return None
-          | Some (con', instr', ts')  ->
-            instrs_rule con' (ts'@tr) (size/2) >>= (function
-              | None        -> return None
-              | Some instrs -> return (Some (instr'::instrs)) ) ) in
-    match output_ts with
-          []          ->
-            let empty_gen = recgen context None [] in
-              Gen.(oneof [ empty_gen; return (Some []) ])
-          | t1::trst  ->
-            let empty_gen = recgen context None output_ts in
-            let non_empty_gen = recgen context (Some t1) trst in
-              Gen.(frequency [ 1, empty_gen; 4, non_empty_gen; ])
+  let recgen con t_opt tr = Gen.(instr_rule con t_opt (size/2) >>= function
+    | None              -> return None
+    | Some (con', instr', ts')  ->
+      instrs_rule con' (ts'@tr) (size/2) >>= (function
+          | None        -> return None
+          | Some instrs -> return (Some (instr'::instrs)))) in
+  match output_ts with
+    []          ->
+    let empty_gen = recgen context None [] in
+    Gen.(oneof [ empty_gen; return (Some []) ])
+  | t1::trst  ->
+    let empty_gen = recgen context None output_ts in
+    let non_empty_gen = recgen context (Some t1) trst in
+    Gen.frequency [ 1, empty_gen; 4, non_empty_gen; ]
 
 (** instr_rule : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
 and instr_rule con t_opt size =
@@ -91,26 +91,27 @@ and instr_rule con t_opt size =
 
 and generate_rule rules =
   let rec remove ctw gw xs = match xs with
-      | e::rst -> let tw = ctw + (fst e) in
-        (match tw >= gw with
-          | true  -> rst
-          | false -> e::(remove tw gw rst))
-      | []  -> [] in
+    | [] -> []
+    | ((w,_) as e)::rst ->
+      let tw = ctw + w in
+      if tw >= gw
+      then rst
+      else e::(remove tw gw rst) in
   let rec verify ctw gw xs = match xs with
-      | e::rst -> let tw = ctw + (fst e) in
-        (match tw >= gw with
-          | true  -> Gen.(snd e >>= fun t -> match t with
-            | Some _ -> return t
-            | None   ->
-              (
-              (* Sys.command ("echo 1 >> stat/backtrack" ); *)
-              generate_rule (remove 0 gw rules)))
-          | false -> verify tw gw rst)
-      | []  -> Gen.return None in
-  let tw = List.fold_left (fun t (w, g) -> t + w ) 0 rules in
-    match tw with
-     | 0 -> Gen.return None
-     | _ -> Gen.( int_range 1 tw >>= fun gw -> verify 0 gw rules)
+    | [] -> Gen.return None
+    | (w,g)::rst ->
+      let tw = ctw + w in
+      (match tw >= gw with
+       | true  -> Gen.(g >>= fun t -> match t with
+         | Some _ -> return t
+         | None   ->
+           ( (* Sys.command ("echo 1 >> stat/backtrack" ); *)
+             generate_rule (remove 0 gw rules)))
+       | false -> verify tw gw rst) in
+  let tw = List.fold_left (fun t (w, _g) -> t + w) 0 rules in
+  match tw with
+  | 0 -> Gen.return None
+  | _ -> Gen.( int_range 1 tw >>= fun gw -> verify 0 gw rules)
 
 (**** Numeric Instructions ****)
 (*** Const ***)
@@ -165,7 +166,7 @@ and const_gen con t_opt size = match t_opt with
     )
   | Some MemIndexType -> (match con.mems with
     | Some mem -> 
-      let min = (Int32.to_int mem.min) in
+      let min = Int32.to_int mem.min in
       if min = 0
       then Gen.return None
       else Gen.( 
@@ -396,7 +397,7 @@ and load_gen con t_opt size = match con.mems with
         1, return None;
         3, pair (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32]) (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) -> return (Some (p, sx))
       ] >>= fun p_opt ->
-        pair (align_load_gen (to_wasm_value_type t) p_opt) (ui32)  >>= fun (align, offset) ->
+        pair (align_load_gen (to_wasm_value_type t) p_opt) ui32 >>= fun (align, offset) ->
           let mop = {
             Ast.ty = to_wasm_value_type t;
             Ast.align = align;
@@ -584,7 +585,8 @@ and call_gen (con: context_) t_opt size =
 and callindirect_gen (con: context_) t_opt size =
   match con.elems with
     | None   -> Gen.return None
-    | Some a -> let ilist = get_findex t_opt a in
+    | Some a ->
+      let ilist = get_findex t_opt a in
       if ilist = []
       then Gen.return None
       else Gen.( oneofl ilist >>= fun e ->
