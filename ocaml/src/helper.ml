@@ -2,13 +2,13 @@ open Wasm
 open QCheck
 
 type globals_ = {
-  g_m_i32: int list;
+  g_m_i32:  int list;
   g_im_i32: int list;
-  g_m_i64: int list;
+  g_m_i64:  int list;
   g_im_i64: int list;
-  g_m_f32: int list;
+  g_m_f32:  int list;
   g_im_f32: int list;
-  g_m_f64: int list;
+  g_m_f64:  int list;
   g_im_f64: int list;
 }
 
@@ -23,16 +23,16 @@ type funcs_ = {
 }
 
 type context_ = {
-  labels: (value_type option * value_type option) list;
-  funcs: funcs_;
+  labels:  (value_type option * value_type option) list;
+  funcs:   funcs_;
   imports: (value_type list * value_type option) list;
-  mems: Int32.t Types.limits option;
-  data: string Ast.segment list;
-  tables: Int32.t Types.limits option;
-  elems: ((value_type option * int) option) array option;
-  locals: value_type list;
+  mems:    Int32.t Types.limits option;
+  data:    string Ast.segment list;
+  tables:  Int32.t Types.limits option;
+  elems:   ((value_type option * int) option) array option;
+  locals:  value_type list;
   globals: globals_;
-  return: value_type option;
+  return:  value_type option;
   funcindex: int;
 }
 
