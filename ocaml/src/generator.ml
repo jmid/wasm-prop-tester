@@ -363,57 +363,47 @@ let module_gen = Gen.(
           fun es ->
 
           let con = extend_context context ds in
-          let con' = process_globals con gltypelist in
-          let con'' = process_funcs con' ftypelist 7 in
-          let con''' = process_elems con'' es in
+          let con = process_globals con gltypelist in
+          let con = process_funcs con ftypelist 7 in
+          let con = process_elems con es in
             
-            rec_func_gen con''' [] (outtypes@ftypelist) 3 >>= fun funcs ->
-                    
+            rec_func_gen con [] (outtypes@ftypelist) 3 >>= fun funcs ->
+                let imports_str = string_to_name "imports" in
+                let log_str     = string_to_name "log" in
+                let mk_func_import i =
+                  as_phrase { Ast.module_name = imports_str;
+                              Ast.item_name = log_str;
+                              Ast.idesc = as_phrase (Ast.FuncImport (as_phrase i))
+                            } in
+                let mk_func_export s i =
+                  as_phrase { Ast.name = string_to_name s;
+                              Ast.edesc = as_phrase (Ast.FuncExport (as_phrase i));
+                            } in
                 return (as_phrase {
-                  Ast.types = (func_type_list_to_type_phrase (intypes@outtypes@ftypelist));
-                  Ast.globals = (List.map triple_to_global gltypelist);
-                  Ast.tables = (limits_to_ast_table con'''.tables);
-                  Ast.memories = (limits_to_ast_memory con'''.mems);
-                  Ast.funcs = (List.rev funcs);
+                  Ast.types = func_type_list_to_type_phrase (intypes@outtypes@ftypelist);
+                  Ast.globals  = List.map triple_to_global gltypelist;
+                  Ast.tables   = limits_to_ast_table con.tables;
+                  Ast.memories = limits_to_ast_memory con.mems;
+                  Ast.funcs = List.rev funcs;
                   Ast.start = start;
-                  Ast.elems  = (elems_to_ast_elems es);
-                  Ast.data = (con'''.data);
-                  Ast.imports = [
-                    as_phrase({
-                      Ast.module_name = string_to_name "imports";
-                      Ast.item_name = string_to_name "log";
-                      Ast.idesc = as_phrase (Ast.FuncImport (as_phrase 0l))
-                    });
-                    as_phrase({
-                      Ast.module_name = string_to_name "imports";
-                      Ast.item_name = string_to_name "log";
-                      Ast.idesc = as_phrase (Ast.FuncImport (as_phrase 1l))
-                    });
-                    as_phrase({
-                      Ast.module_name = string_to_name "imports";
-                      Ast.item_name = string_to_name "log";
-                      Ast.idesc = as_phrase (Ast.FuncImport (as_phrase 2l))
-                    });
-                  ];
-                  Ast.exports = [
-                    as_phrase ({
-                      Ast.name = string_to_name "runi32";
-                      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 4l));
-                    });
-                    as_phrase ({
-                      Ast.name = string_to_name "runf32";
-                      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 5l));
-                    });
-                    as_phrase ({
-                      Ast.name = string_to_name "runf64";
-                      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 6l));
-                    })
-                  ];
+                  Ast.elems = elems_to_ast_elems es;
+                  Ast.data  = con.data;
+                  Ast.imports =
+                    [ mk_func_import 0l;
+                      mk_func_import 1l;
+                      mk_func_import 2l; ];
+                  Ast.exports =
+                    [ mk_func_export "runi32" 4l;
+                      mk_func_export "runf32" 5l;
+                      mk_func_export "runf64" 6l; ];
                   }
                 )
 )
 
-let arb_module = make module_gen
+let module_printer (m : Wasm.Ast.module_' Wasm.Source.phrase) =
+  Sexpr.to_string 80 (Arrange.module_ m)
+
+let arb_module = make ~print:module_printer module_gen
 
 let stat_dir_name = "stat";;
 
