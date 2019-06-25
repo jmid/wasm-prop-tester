@@ -12,12 +12,6 @@ let tmp_dir = match Sys.file_exists tmp_dir_name with
 let wat_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wat";;
 let wasm_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wasm";;
 
-let string_to_name s =
-  let rec exp i l =
-    if i < 0 then l else exp (i - 1) (Char.code(s.[i]) :: l) in
-  exp (String.length s - 1) []
-;;
-
 let get_func input ftype body =
   {
     Ast.ftype = ftype;
