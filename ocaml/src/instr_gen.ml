@@ -117,101 +117,104 @@ and generate_rule rules =
 (*** Const ***)
 (** const_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and const_gen con t_opt size = match t_opt with
+  | None -> Gen.return None
   | Some I32Type -> Gen.(
-    let corner_gen =
-      (oneofl [ 0x7fffffffl; 0x80000000l; 0x80000001l; 0x00000000l; 0x3fffffffl; 0x01234567l; 0x8ff00ff0l;
-                0x40000000l; 0xabcd9876l; 0xfe00dc00l; 0xb0c1d2e3l; 0x769abcdfl])
-    in
+      let corner_gen =
+        oneofl [ 0x7fffffffl; 0x80000000l; 0x80000001l; 0x00000000l; 0x3fffffffl;
+                 0x01234567l; 0x8ff00ff0l; 0x40000000l; 0xabcd9876l; 0xfe00dc00l;
+                 0xb0c1d2e3l; 0x769abcdfl ] in
       map
       (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 i))), []))
-      (frequency [ 11, corner_gen; 2, ui32; ])
+      (frequency [ 2, corner_gen; 2, ui32; ])
     )
   | Some I64Type -> Gen.(
-    let corner_gen =
-      (oneofl [ (*0x7fffffffffffffffL;*) 0x8000000000000000L; 0x3fffffffL; 0x0123456789abcdefL; 0x8ff00ff00ff00ff0L;
-                0xf0f0ffffL; 0x4000000000000000L; 0xabcd1234ef567809L; 0xabd1234ef567809cL; 0xabcd987602468aceL; 0xfe000000dc000000L; 0x00008000L;
-                0x00010000L; 0xAAAAAAAA55555555L; 0x99999999AAAAAAAAL; 0xDEADBEEFDEADBEEFL])
-    in
+      let corner_gen =
+        oneofl [ (*0x7fffffffffffffffL;*) 0x8000000000000000L; 0x3fffffffL;
+                 0x0123456789abcdefL; 0x8ff00ff00ff00ff0L; 0xf0f0ffffL;
+                 0x4000000000000000L; 0xabcd1234ef567809L; 0xabd1234ef567809cL;
+                 0xabcd987602468aceL; 0xfe000000dc000000L; 0x00008000L;
+                 0x00010000L; 0xAAAAAAAA55555555L; 0x99999999AAAAAAAAL;
+                 0xDEADBEEFDEADBEEFL ] in
       map
       (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I64 i))), []))
-      (frequency [ 11, corner_gen; 2, ui64; ])
+      (frequency [ 2, corner_gen; 2, ui64; ])
     )
   | Some F32Type -> Gen.(
     let corner_gen = 
       map
       F32.of_string
-      (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126"; "-0x1p-126";
-                "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127"; "-0x1.fffffep+127"]) in
-    let f32 = 
-      map
-      F32.of_float
-      float
-    in
+      (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126";
+                "-0x1p-126"; "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127";
+                "-0x1.fffffep+127"]) in
+    let f32 = map F32.of_float float in
       map
       (fun f -> Some (con, as_phrase (Ast.Const (as_phrase (Values.F32 f))), []))
-      (frequency [ 11, corner_gen; 2, f32; ])
+      (frequency [ 2, corner_gen; 2, f32; ])
     )
   | Some F64Type -> Gen.(
     let corner_gen = 
       map
       F64.of_string
-      (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1"; "-0x1p-1";
-                "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022"; "0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2"; 
+      (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1";
+                "-0x1p-1"; "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022";
+                "0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2";
                 "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"]) in
-    let f64 = map F64.of_float float
-    in
+    let f64 = map F64.of_float float in
       map
       (fun f -> Some (con, as_phrase (Ast.Const (as_phrase (Values.F64 f))), []))
-      (frequency [ 11, corner_gen; 2, f64; ])
+      (frequency [ 2, corner_gen; 2, f64; ])
     )
   | Some MemIndexType -> (match con.mems with
-    | Some mem -> 
-      let min = Int32.to_int mem.min in
-      if min = 0
-      then Gen.return None
-      else Gen.( 
-        map
-        (fun i -> (Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))), [])))
-        (int_bound ((min * 65536) - 8)) 
-      )
-    | None     -> Gen.return None)
-  | Some TableIndex i  -> Gen.return (Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))), []))
-  | None               -> Gen.return None
+      | None     -> Gen.return None
+      | Some mem -> 
+        let min = Int32.to_int mem.min in
+        if min = 0
+        then Gen.return None
+        else Gen.( 
+            map
+              (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))), []))
+              (int_bound ((min * 65536) - 8))))
+  | Some TableIndex i -> Gen.return (Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))), []))
 
 (*** Unary operations ***)
 (** intOp_unop_gen : IntOp.unop Gen.t **)
-and intOp_unop_gen = Gen.oneofl
-  [ Ast.IntOp.Clz; Ast.IntOp.Ctz; Ast.IntOp.Popcnt; ]
+and intOp_unop_gen =
+  Gen.oneofl [ Ast.IntOp.Clz; Ast.IntOp.Ctz; Ast.IntOp.Popcnt; ]
 
 (** floatOp_unop_gen : FloatOp.unop Gen.t *)
-and floatOp_unop_gen = Gen.oneofl
-  [ Ast.FloatOp.Neg; Ast.FloatOp.Abs; Ast.FloatOp.Ceil; Ast.FloatOp.Floor; Ast.FloatOp.Trunc; Ast.FloatOp.Nearest; (*Ast.FloatOp.Sqrt;*) ]
+and floatOp_unop_gen =
+  Gen.oneofl [ Ast.FloatOp.Neg; Ast.FloatOp.Abs; Ast.FloatOp.Ceil; Ast.FloatOp.Floor;
+               Ast.FloatOp.Trunc; Ast.FloatOp.Nearest; (*Ast.FloatOp.Sqrt;*) ]
 
 (** unop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and unop_gen con t_opt size = match t_opt with
   | Some I32Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I32 op)), [I32Type;])))
+    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I32 op)), [I32Type])))
     intOp_unop_gen
   | Some I64Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I64 op)), [I64Type;])))
+    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I64 op)), [I64Type])))
     intOp_unop_gen
   | Some F32Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F32 op)), [F32Type;])))
+    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F32 op)), [F32Type])))
     floatOp_unop_gen
   | Some F64Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F64 op)), [F64Type;])))
+    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F64 op)), [F64Type])))
     floatOp_unop_gen
   | Some _ | None -> Gen.return None
 
 (*** Binary operations ***)
 (** intOp_binop_gen : IntOp.binop Gen.t **)
-and intOp_binop_gen = Gen.oneofl
-  [ Ast.IntOp.Add; Ast.IntOp.Sub; Ast.IntOp.Mul; Ast.IntOp.DivS; Ast.IntOp.DivU; Ast.IntOp.RemS; Ast.IntOp.RemU;
-    Ast.IntOp.And; Ast.IntOp.Or; Ast.IntOp.Xor; Ast.IntOp.Shl; Ast.IntOp.ShrS; Ast.IntOp.ShrU; Ast.IntOp.Rotl; Ast.IntOp.Rotr; ]
+and intOp_binop_gen =
+  Gen.oneofl
+    [ Ast.IntOp.Add; Ast.IntOp.Sub; Ast.IntOp.Mul; Ast.IntOp.DivS; Ast.IntOp.DivU;
+      Ast.IntOp.RemS; Ast.IntOp.RemU; Ast.IntOp.And; Ast.IntOp.Or; Ast.IntOp.Xor;
+      Ast.IntOp.Shl; Ast.IntOp.ShrS; Ast.IntOp.ShrU; Ast.IntOp.Rotl; Ast.IntOp.Rotr; ]
 
 (** floatOp_binop_gen : FloatOp.binop Gen.t **)
-and floatOp_binop_gen = Gen.oneofl
-  [ Ast.FloatOp.Add; Ast.FloatOp.Sub; Ast.FloatOp.Mul; Ast.FloatOp.Div; Ast.FloatOp.Min; Ast.FloatOp.Max; Ast.FloatOp.CopySign; ]
+and floatOp_binop_gen =
+  Gen.oneofl
+    [ Ast.FloatOp.Add; Ast.FloatOp.Sub; Ast.FloatOp.Mul; Ast.FloatOp.Div;
+      Ast.FloatOp.Min; Ast.FloatOp.Max; Ast.FloatOp.CopySign; ]
 
 (** binop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and binop_gen con t_opt size = match t_opt with
@@ -232,26 +235,34 @@ and binop_gen con t_opt size = match t_opt with
 (*** Test operations ***)
 (** testop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and testop_gen con t_opt size = match t_opt with
-  | Some I32Type -> Gen.oneofl [ Some (con, as_phrase (Ast.Test (Values.I32 Ast.IntOp.Eqz)), [I32Type;]);
-                                 Some (con, as_phrase (Ast.Test (Values.I64 Ast.IntOp.Eqz)), [I64Type;]); ]
+  | Some I32Type ->
+    Gen.oneofl [ Some (con, as_phrase (Ast.Test (Values.I32 Ast.IntOp.Eqz)), [I32Type]);
+                 Some (con, as_phrase (Ast.Test (Values.I64 Ast.IntOp.Eqz)), [I64Type]); ]
   | Some _ | None -> Gen.return None
 
 (*** Compare operations ***)
 (** intOp_relop_gen : IntOp.relop Gen.t **)
-and intOp_relop_gen = Gen.oneofl
-  [ Ast.IntOp.Eq; Ast.IntOp.Ne; Ast.IntOp.LtS; Ast.IntOp.LtU; Ast.IntOp.GtS; Ast.IntOp.GtU; Ast.IntOp.LeS; Ast.IntOp.LeU; Ast.IntOp.GeS; Ast.IntOp.GeU; ]
+and intOp_relop_gen =
+  Gen.oneofl
+    [ Ast.IntOp.Eq; Ast.IntOp.Ne; Ast.IntOp.LtS; Ast.IntOp.LtU; Ast.IntOp.GtS;
+      Ast.IntOp.GtU; Ast.IntOp.LeS; Ast.IntOp.LeU; Ast.IntOp.GeS; Ast.IntOp.GeU; ]
 
 (** floatOp_relop_gen : FloatOp.relop Gen.t **)
-and floatOp_relop_gen = Gen.oneofl
-  [ Ast.FloatOp.Eq; Ast.FloatOp.Ne; Ast.FloatOp.Lt; Ast.FloatOp.Gt; Ast.FloatOp.Le; Ast.FloatOp.Ge; ]
+and floatOp_relop_gen =
+  Gen.oneofl
+    [ Ast.FloatOp.Eq; Ast.FloatOp.Ne; Ast.FloatOp.Lt; Ast.FloatOp.Gt; Ast.FloatOp.Le;
+      Ast.FloatOp.Ge; ]
 
 (** relop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and relop_gen con t_opt size = match t_opt with
-  | Some I32Type -> Gen.(oneof [
-    (intOp_relop_gen >>= fun op -> oneofl [ Some (con, as_phrase (Ast.Compare (Values.I32 op)), [I32Type; I32Type]);
-                                            Some (con, as_phrase (Ast.Compare (Values.I64 op)), [I64Type; I64Type]) ]);
-    (floatOp_relop_gen >>= fun op -> oneofl [ Some (con, as_phrase (Ast.Compare (Values.F32 op)), [F32Type; F32Type]);
-                                              Some (con, as_phrase (Ast.Compare (Values.F64 op)), [F64Type; F64Type]) ]); ])
+  | Some I32Type ->
+    Gen.(oneof [
+        (intOp_relop_gen >>= fun op ->
+         oneofl [ Some (con, as_phrase (Ast.Compare (Values.I32 op)), [I32Type; I32Type]);
+                  Some (con, as_phrase (Ast.Compare (Values.I64 op)), [I64Type; I64Type])]);
+        (floatOp_relop_gen >>= fun op ->
+         oneofl [ Some (con, as_phrase (Ast.Compare (Values.F32 op)), [F32Type; F32Type]);
+                  Some (con, as_phrase (Ast.Compare (Values.F64 op)), [F64Type; F64Type])]); ])
   | Some _ | None -> Gen.return None
 
 (*** Convert operations ***)
@@ -313,23 +324,23 @@ and drop_gen con t_opt size = match t_opt with
 (*** Select ***)
 (** select_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and select_gen con t_opt size = match t_opt with
-  | Some t -> Gen.return (Some (con, as_phrase (Ast.Select), [I32Type; t; t]))
   | None   -> Gen.return None
+  | Some t -> Gen.return (Some (con, as_phrase (Ast.Select), [I32Type; t; t]))
 
 (**** Variable Instructions ****)
 
 (*** LocalGet ***)
 (** localGet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and localGet_gen (con: context_) t_opt size = match t_opt with
-  | Some t ->
-    (let locals = get_indexes t con.locals in
-      match locals with
-        | e::es -> Gen.( 
-          map
-          (fun i -> (Some (con, as_phrase (Ast.LocalGet (as_phrase (Int32.of_int i))), [])))
-          (oneofl locals))
-        | []    -> Gen.return None )
   | None -> Gen.return None
+  | Some t ->
+    let locals = get_indexes t con.locals in
+    match locals with
+    | []    -> Gen.return None
+    | e::es ->
+      Gen.(map
+             (fun i -> Some (con, as_phrase (Ast.LocalGet (as_phrase (Int32.of_int i))), []))
+             (oneofl locals))
 
 (*** LocalSet ***)
 (** localSet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -337,54 +348,58 @@ and localSet_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None -> match List.length con.locals with
     | 0 -> Gen.return None
-    | n -> Gen.( int_range 1 n >>= fun g ->
-      let i = g - 1 in
-      let t = List.nth con.locals i in
-        return (Some (con, as_phrase (Ast.LocalSet (as_phrase (Int32.of_int i))), [t])) )
+    | n ->
+      Gen.(int_range 1 n >>= fun g ->
+           let i = g - 1 in
+           let t = List.nth con.locals i in
+           return (Some (con, as_phrase (Ast.LocalSet (as_phrase (Int32.of_int i))), [t])))
 
 (*** LocalTee ***)
 (** localTee_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and localTee_gen (con: context_) t_opt size = match t_opt with
-  | Some t ->
-    (let locals = get_indexes t con.locals in
-      match locals with
-        | e::es -> Gen.(map
-          (fun i -> (Some (con, as_phrase (Ast.LocalTee (as_phrase (Int32.of_int i))), [t])))
-          (oneofl locals))
-        | []    -> Gen.return None )
   | None -> Gen.return None
+  | Some t ->
+    let locals = get_indexes t con.locals in
+    match locals with
+    | []    -> Gen.return None
+    | e::es ->
+      Gen.(map
+             (fun i -> Some (con, as_phrase (Ast.LocalTee (as_phrase (Int32.of_int i))), [t]))
+             (oneofl locals))
 
 (*** GlobalGet ***)
 (** globalGet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and globalGet_gen (con: context_) t_opt size = match t_opt with
-  | Some t ->
-    (let globals = get_global_indexes t con.globals None in
-    match globals with
-      | e::es -> Gen.( map
-        (fun i -> (Some (con, as_phrase (Ast.GlobalGet (as_phrase (Int32.of_int i))), [])))
-        (oneofl globals))
-      | []    -> Gen.return None )
   | None -> Gen.return None
+  | Some t ->
+    let globals = get_global_indexes t con.globals None in
+    match globals with
+    | []    -> Gen.return None
+    | e::es ->
+      Gen.(map
+             (fun i -> Some (con, as_phrase (Ast.GlobalGet (as_phrase (Int32.of_int i))), []))
+             (oneofl globals))
 
 (*** GlobalSet ***)
 (** globalSet_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and globalSet_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
-  | None -> Gen.( oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
-              (let globals = get_global_indexes t con.globals (Some Types.Mutable) in
-                match globals with
-                  | e::es -> Gen.(map
-                    (fun i -> (Some (con, as_phrase (Ast.GlobalSet (as_phrase (Int32.of_int i))), [t])))
-                    (oneofl globals))
-                  | []    -> Gen.return None ))
+  | None ->
+    Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
+         let globals = get_global_indexes t con.globals (Some Types.Mutable) in
+         match globals with
+         | []    -> Gen.return None
+         | e::es ->
+           Gen.(map
+                  (fun i -> Some (con, as_phrase (Ast.GlobalSet (as_phrase (Int32.of_int i))), [t]))
+                  (oneofl globals)))
 
 (**** Memory Instructions ****)
 (** align_load_gen **)
 and align_load_gen t p_opt =
   let width = match p_opt with
     | Some (p,_) -> Memory.packed_size p
-    | None       -> Types.size t
-  in
+    | None       -> Types.size t in
   Gen.(int_range 1 width)
 
 (*** Load ***)
@@ -392,20 +407,22 @@ and align_load_gen t p_opt =
 and load_gen con t_opt size = match con.mems with
   | None   -> Gen.return None
   | Some m -> (match t_opt with
-    | Some t -> Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
-      frequency [
-        1, return None;
-        3, pair (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32]) (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) -> return (Some (p, sx))
-      ] >>= fun p_opt ->
+      | None   -> Gen.return None
+      | Some t ->
+        Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
+             frequency [
+               1, return None;
+               3, pair
+                    (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32])
+                    (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) ->
+               return (Some (p, sx)) ] >>= fun p_opt ->
         pair (align_load_gen (to_wasm_value_type t) p_opt) ui32 >>= fun (align, offset) ->
-          let mop = {
-            Ast.ty = to_wasm_value_type t;
-            Ast.align = align;
-            Ast.offset = offset;
-            Ast.sz = p_opt
-          } in
+          let mop = { Ast.ty     = to_wasm_value_type t;
+                      Ast.align  = align;
+                      Ast.offset = offset;
+                      Ast.sz     = p_opt } in
           return (Some (con, as_phrase (Ast.Load mop), [t; I32Type;])))
-    | None   -> Gen.return None)
+)
 
 (** align_store_gen **)
 and align_store_gen t p_opt =
@@ -425,14 +442,13 @@ and store_gen con t_opt size = match con.mems with
       if (Int32.to_int m.min) < 1
       then Gen.return None
       else Gen.(oneofl [I32Type; I64Type; (*Helper.F32Type; Helper.F64Type;*)] >>= fun t ->
-        frequency [ 1, return None; 3, (oneofl [Memory.Pack8; Memory.Pack16; (*Memory.Pack32;*)] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
+                frequency [ 1, return None;
+                            3, (oneofl [Memory.Pack8; Memory.Pack16; (*Memory.Pack32;*)] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
           pair (align_store_gen (to_wasm_value_type t) p_opt) (ui32) >>= fun (align, offset) ->
-            let mop = {
-              Ast.ty = to_wasm_value_type t;
-              Ast.align = 0;
-              Ast.offset = 0l;
-              Ast.sz = p_opt
-            } in
+            let mop = { Ast.ty     = to_wasm_value_type t;
+                        Ast.align  = 0;
+                        Ast.offset = 0l;
+                        Ast.sz     = p_opt } in
             return (Some (con, as_phrase (Ast.Store mop), [t; MemIndexType;]))))
 
 
@@ -473,7 +489,7 @@ and block_gen (con: context_) t_opt size =
     | None   -> []
   in
   Gen.(instrs_rule (addLabel (t_opt, t_opt) con) ot (size/2) >>=
-    fun instrs_opt -> match instrs_opt with
+    function
       | Some instrs -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, (List.rev instrs))), []))
       | None        -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, [])), [])) )
 
@@ -485,7 +501,7 @@ and loop_gen (con: context_) t_opt size =
     | None   -> []
   in
   Gen.(instrs_rule (addLabel (None, t_opt) con) ot (size/2) >>=
-    fun instrs_opt -> match instrs_opt with
+    function
       | Some instrs -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, (List.rev instrs))), []))
       | None        -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, [])), [])) )
 
@@ -496,8 +512,8 @@ and if_gen (con: context_) t_opt size =
     | Some t -> [t]
     | None   -> []
   in
-  Gen.( pair (instrs_rule (addLabel ((Some I32Type), t_opt) con) ot (size/2))
-             (instrs_rule (addLabel ((Some I32Type), t_opt) con) ot (size/2)) >>=
+  Gen.(pair (instrs_rule (addLabel (Some I32Type, t_opt) con) ot (size/2))
+            (instrs_rule (addLabel (Some I32Type, t_opt) con) ot (size/2)) >>=
       fun (instrs_opt1, instrs_opt2) ->
         let instrs1 = match instrs_opt1 with
           | Some instrs -> instrs
@@ -511,40 +527,41 @@ and if_gen (con: context_) t_opt size =
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and br_gen (con: context_) t_opt size =
   match get_indexes_and_inputs t_opt con.labels with
-    | e::es -> Gen.( oneofl (e::es) >>= fun (i,it_opt) ->
-      let it = match it_opt with
-        | Some t -> [t]
-        | None   -> []
-      in
-      return (Some (con, as_phrase (Ast.Br (as_phrase (Int32.of_int i))), it)) )
-    | []    -> Gen.return None
+  | []    -> Gen.return None
+  | e::es ->
+    Gen.(oneofl (e::es) >>= fun (i,it_opt) ->
+         let it = match it_opt with
+           | Some t -> [t]
+           | None   -> [] in
+         return (Some (con, as_phrase (Ast.Br (as_phrase (Int32.of_int i))), it)))
 
 (*** BrIf ***)
 (** brif_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brif_gen (con: context_) t_opt size =
   let labels = get_indexes_and_inputs t_opt con.labels in
-    match labels with
-      | e::es -> Gen.( oneofl labels >>= fun (i,it_opt) ->
-        let it = match it_opt with
-          | Some t -> [t]
-          | None   -> []
-        in
-        return (Some (con, as_phrase (Ast.BrIf (as_phrase (Int32.of_int i))), I32Type::it)) )
-      | []    -> Gen.return None
+  match labels with
+  | []    -> Gen.return None
+  | e::es ->
+    Gen.(oneofl labels >>= fun (i,it_opt) ->
+         let it = match it_opt with
+           | Some t -> [t]
+           | None   -> [] in
+          return (Some (con, as_phrase (Ast.BrIf (as_phrase (Int32.of_int i))), I32Type::it)))
 
 (*** BrTable ***)
 (** brtable_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brtable_gen (con: context_) t_opt size =
   let labels = get_indexes_and_inputs t_opt con.labels in
-    match labels with
-      | e::es -> Gen.( oneofl labels >>= fun (i,it_opt) ->
-        let it = match it_opt with
-          | Some t -> [t]
-          | None   -> []
-        in
-        list (oneofl labels >>= fun (i',it_opt') -> return (as_phrase (Int32.of_int i'))) >>= fun ilist ->
-          return (Some (con, as_phrase (Ast.BrTable (ilist, (as_phrase (Int32.of_int i)))), I32Type::it)) )
-      | []    -> Gen.return None
+  match labels with
+  | []    -> Gen.return None
+  | e::es ->
+    Gen.(oneofl labels >>= fun (i,it_opt) ->
+         let it = match it_opt with
+           | Some t -> [t]
+           | None   -> [] in
+         list (oneofl labels >>= fun (i',it_opt') ->
+               return (as_phrase (Int32.of_int i'))) >>= fun ilist ->
+         return (Some (con, as_phrase (Ast.BrTable (ilist, (as_phrase (Int32.of_int i)))), I32Type::it)) )
 
 (*** Return ***)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -552,8 +569,7 @@ and return_gen (con: context_) t_opt size =
   let tlist = try match con.return with
     | Some t -> [t]
     | None   -> []
-  with Failure _ -> []
-  in
+  with Failure _ -> [] in
   Gen.return (Some (con, as_phrase Ast.Return, tlist))
 
 (*** Call ***)
@@ -566,8 +582,7 @@ and call_gen (con: context_) t_opt size =
     | Some F32Type       -> con.funcs.f_f32
     | Some F64Type       -> con.funcs.f_f64
     | Some MemIndexType  -> []
-    | Some TableIndex _  -> []
-  in
+    | Some TableIndex _  -> [] in
   if ilist = []
   then Gen.return None
   else
@@ -597,9 +612,7 @@ and callindirect_gen (con: context_) t_opt size =
               return (Some (con, as_phrase (Ast.CallIndirect (as_phrase (Int32.of_int (snd e)))), (TableIndex (fst e))::(List.rev (fst ftype))))
       )
 
-let instr_gen context types =
-  Gen.(sized (fun n ->
-    instrs_rule context (snd types) n >>= fun instrs -> return instrs))
+let instr_gen context types = Gen.sized (instrs_rule context (snd types))
   (* Gen.(sized_size (int_bound 500) (fun n ->
     instrs_rule context (snd types) n >>= fun instrs -> return instrs)) *)
   (* Gen.(sized_size (int_bound 1000) (fun n ->
