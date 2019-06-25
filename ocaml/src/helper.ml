@@ -54,7 +54,7 @@ let string_to_name s =
   exp (String.length s - 1) []
 ;;
 
-let as_phrase x = {Source.at = Source.no_region; Source.it = x}
+let as_phrase x = { Source.at = Source.no_region; Source.it = x }
 ;;
 
 let types_ = [ 
@@ -66,20 +66,23 @@ let types_ = [
 ];;
 
 
-(** get_indexes: a' -> a list -> int list **)
+(** get_indexes: 'a -> 'a list -> int list **)
 let get_indexes a l =
-  let rec get_index a' l' i = try match (List.nth l' i) = a' with
-    | true  -> i::(get_index a' l' (i+1)) 
-    | false -> get_index a' l' (i+1) with Failure _ -> [] in
+  let rec get_index a' l' i = match l' with
+    | [] -> []
+    | e::es ->
+      if e = a'
+      then i::(get_index a' es (i+1))
+      else (get_index a' es (i+1)) in
   get_index a l 0
 
-let typeToString a = Types.string_of_value_type a
+let typeToString = Types.string_of_value_type
 
 let mToString = function
+  | None   -> "None"
   | Some m -> (match m with 
     | Types.Mutable   -> "Mutable"
     | Types.Immutable -> "Immutable")
-  | None   -> "None"
 
 (** get_global_indexes: a' -> a list -> int list **)
 let get_global_indexes t (l: globals_) m =
@@ -116,7 +119,7 @@ let get_global_indexes t (l: globals_) m =
     | TableIndex _ -> []
 
 
-(** get_random_element: 'a -> ('a * 'b) list -> 'b **)
+(** get_random_element: 'a -> ('b * 'a) list -> 'b option **)
 let get_random_element a l =
   let rec get_index a' l' i = try
     let element = List.nth l' i in
@@ -128,7 +131,7 @@ let get_random_element a l =
     | 0 -> None
     | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None
 
-(** get_indexes_and_inputs: a' -> a list -> (int * stack_type) list **)
+(** get_indexes_and_inputs: a' -> ('b * 'a) list -> (int * stack_type) list **)
 let get_indexes_and_inputs a l =
   let rec get_index_ot a' b' l' i = try
     let element = List.nth l' i in
@@ -138,7 +141,6 @@ let get_indexes_and_inputs a l =
   match get_random_element a l with
     | Some t -> get_index_ot a t l 1
     | None   -> []
-
 
 (** get_random_global: 'a -> ('a * 'b) list -> int -> 'b **)
 let get_random_global a l index =
