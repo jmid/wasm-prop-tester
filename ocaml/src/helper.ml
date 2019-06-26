@@ -44,18 +44,14 @@ let to_wasm_value_type = function
   | MemIndexType -> Types.I32Type
   | TableIndex _ -> Types.I32Type
 
-let rec to_stack_type = function
-  | []     -> []
-  | e::rst -> (to_wasm_value_type e)::(to_stack_type rst)
+let to_stack_type = List.map to_wasm_value_type
 
 let string_to_name s =
   let rec exp i l =
     if i < 0 then l else exp (i - 1) (Char.code(s.[i]) :: l) in
   exp (String.length s - 1) []
-;;
 
 let as_phrase x = { Source.at = Source.no_region; Source.it = x }
-;;
 
 let types_ = [ 
   as_phrase (Types.FuncType ([], []));
@@ -63,19 +59,13 @@ let types_ = [
   as_phrase (Types.FuncType ([], [Types.I64Type]));
   as_phrase (Types.FuncType ([], [Types.F32Type]));
   as_phrase (Types.FuncType ([], [Types.F64Type]))
-];;
+]
 
 
 (** get_indexes: 'a -> 'a list -> int list **)
 let get_indexes a l =
-  let rec get_index l i = match l with
-    | [] -> []
-    | e::l' ->
-      if e = a
-      then i::(get_index l' (i+1))
-      else get_index l' (i+1) in
-  get_index l 0
-
+  snd (List.fold_left (fun (i,acc) e -> (i+1, if e = a then i::acc else acc)) (0,[]) l)
+  
 let typeToString = Types.string_of_value_type
 
 let mToString = function
@@ -106,70 +96,48 @@ let get_global_indexes t (l: globals_) m = match t with
 
 (** get_random_element: 'a -> ('b * 'a) list -> 'b option Gen.t **)
 let get_random_element a l =
-  let rec get_index l = match l with
-    | [] -> []
-    | (fst,snd)::l' ->
-      if snd = a
-      then fst::(get_index l')
-      else get_index l' in
-  let type_list = get_index l in
+  let type_list =
+    List.fold_left (fun acc (fst,snd) -> if snd = a then fst::acc else acc) [] l in
   if type_list = []
   then Gen.return None
   else Gen.(map (fun t -> Some t) (oneofl type_list))
 
 (** get_indexes_and_inputs: 'a -> ('b * 'a) list -> (int * stack_type) list Gen.t **)
 let get_indexes_and_inputs a l =
-  let rec get_index_ot b l' i = match l' with
-    | [] -> []
-    | (fst,snd)::es ->
-      if snd = a && fst = b
-      then (i,snd)::(get_index_ot b es (i+1))
-      else           get_index_ot b es (i+1) in
-  Gen.(get_random_element a l >>= function  (* Why does this req. generation? *)
-    | Some t -> return (get_index_ot t l 0)
-    | None   -> return [])
+  let get_index_ot b =
+    snd (List.fold_left
+           (fun (i,acc) (fst,snd) ->
+              (i+1, if snd = a && fst = b then (i,snd)::acc else acc)) (0,[]) l) in
+  Gen.map (function  
+            | None   -> []  (* Why does this req. generation? *)
+            | Some t -> get_index_ot t) (get_random_element a l)
 
+(** get_findex : 'a -> ('a * 'b) option array -> (int * 'b) list **)
 let get_findex t_opt elems =
-  let rec indices il eindex =
-    try 
-      let elem = elems.(eindex) in
-      let il' =
-        match elem with 
-          | None    -> il
-          | Some (fst,snd) ->
-            if fst = t_opt
-            then (eindex, snd)::il
-            else il
-      in
-      indices il' (eindex + 1)
-    with Invalid_argument _ -> il
-  in
-  indices [] 0
+  snd (Array.fold_left (fun (i,il) elem ->
+                         (i+1, match elem with
+                               | None -> il
+                               | Some (fst,snd) ->
+                                 if fst = t_opt then (i, snd)::il else il)) (0,[]) elems)
 
 let get_ftype con funci =
-  let rec find_findex flist t funci = match flist with
-    | [] -> None
-    | (fst,snd)::rst ->
-      if fst = funci
-      then Some (snd, t)
-      else find_findex rst t funci in
-  let ftype = find_findex con.funcs.f_none None funci in
+  let find_findex flist t =
+    match List.find_opt (fun (f,_) -> f = funci) flist with
+    | None -> None
+    | Some (_f,snd) -> Some (snd,t) in
+  let ftype = find_findex con.funcs.f_none None in
   if ftype <> None
   then ftype
   else
-    let ftype = find_findex con.funcs.f_i32 (Some I32Type) funci in
+    let ftype = find_findex con.funcs.f_i32 (Some I32Type) in
     if ftype <> None
     then ftype 
     else
-      let ftype = find_findex con.funcs.f_i64 (Some I64Type) funci in
+      let ftype = find_findex con.funcs.f_i64 (Some I64Type) in
       if ftype <> None
       then ftype 
       else
-        let ftype = find_findex con.funcs.f_f32 (Some F32Type) funci in
+        let ftype = find_findex con.funcs.f_f32 (Some F32Type) in
         if ftype <> None
         then ftype 
-        else
-          (*let ftype =*)find_findex con.funcs.f_f64 (Some F64Type) funci(* in
-          if ftype <> None
-          then ftype
-          else None*)
+        else find_findex con.funcs.f_f64 (Some F64Type)
