@@ -21,7 +21,8 @@ function debugfl (f) {
     let s = f.toString();
     let slen = s.length;
     if (s.includes('.') && slen > 17) {
-	debug(s.slice(0,slen-1));
+//	debug(s.slice(0,slen-1));
+	debug(f.toFixed(13));
     } else {
 	debug(s);
     }
