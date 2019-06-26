@@ -105,7 +105,7 @@ let get_global_indexes t (l: globals_) m = match t with
       | Some Types.Immutable -> l.g_im_f64
       | None                 -> l.g_im_f64)
 
-(** get_random_element: 'a -> ('b * 'a) list -> 'b option **)
+(** get_random_element: 'a -> ('b * 'a) list -> 'b option Gen.t **)
 let get_random_element a l =
   let rec get_index a' l' = match l' with
     | [] -> []
@@ -114,46 +114,21 @@ let get_random_element a l =
       then fst::(get_index a' es)
       else get_index a' es in
   let type_list = get_index a l in
-  match List.length type_list with
-    | 0 -> None
-    | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None
+  if type_list = []
+  then Gen.return None
+  else Gen.(map (fun t -> Some t) (oneofl type_list))
 
-(** get_indexes_and_inputs: a' -> ('b * 'a) list -> (int * stack_type) list **)
+(** get_indexes_and_inputs: a' -> ('b * 'a) list -> (int * stack_type) list Gen.t **)
 let get_indexes_and_inputs a l =
-  let rec get_index_ot a' b' l' i = (*match l' with
+  let rec get_index_ot a' b' l' i = match l' with
     | [] -> []
     | (fst,snd)::es ->
       if snd = a' && fst = b'
       then (i,snd)::(get_index_ot a' b' es (i+1))
-      else           get_index_ot a' b' es (i+1) in *)
-    try
-      let (fst,snd) = List.nth l' i in
-      if snd = a' && fst = b'
-      then (i,snd)::(get_index_ot a' b' l' (i+1))
-      else get_index_ot a' b' l' (i+1)
-    with Failure _ -> [] in
-  match get_random_element a l with
-  | Some t -> get_index_ot a t l 1
-  | None   -> []
-
-(*
-(** get_random_global: 'a -> ('a * 'b) list -> int -> (int * 'b) option **)
-let get_random_global a l index =
-  let rec get_index a' l' i = 
-    if i = index
-    then get_index a' l' (i+1)
-    else
-      try
-        let (fst,snd) = List.nth l' i in
-        if snd = a'
-        then (i,fst)::(get_index a' l' (i+1))
-        else get_index a' l' (i+1)
-      with Failure _ -> [] in
-  let type_list = get_index a l 0 in
-  match List.length type_list with
-    | 0 -> None
-    | n -> try Some (List.nth type_list (Random.int n)) with Failure _ -> None     
-*)
+      else           get_index_ot a' b' es (i+1) in
+  Gen.(get_random_element a l >>= function  (* Why does this req. generation? *)
+    | Some t -> return (get_index_ot a t l 0)
+    | None   -> return [])
 
 let get_findex t_opt elems = 
   let rec indices il eindex =

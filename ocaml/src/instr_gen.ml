@@ -526,11 +526,11 @@ and if_gen (con: context_) t_opt size =
 (*** Br ***)
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and br_gen (con: context_) t_opt size =
-  let labels = get_indexes_and_inputs t_opt con.labels in
-  if labels = []
-  then Gen.return None
-  else
-    Gen.(oneofl labels >>= fun (i,it_opt) ->
+  Gen.(get_indexes_and_inputs t_opt con.labels >>= fun labels ->
+       if labels = []
+       then return None
+       else
+         oneofl labels >>= fun (i,it_opt) ->
          let it = match it_opt with
            | Some t -> [t]
            | None   -> [] in
@@ -539,30 +539,30 @@ and br_gen (con: context_) t_opt size =
 (*** BrIf ***)
 (** brif_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brif_gen (con: context_) t_opt size =
-  let labels = get_indexes_and_inputs t_opt con.labels in
-  if labels = []
-  then Gen.return None
-  else
-    Gen.(oneofl labels >>= fun (i,it_opt) ->
+  Gen.(get_indexes_and_inputs t_opt con.labels >>= fun labels ->
+       if labels = []
+       then return None
+       else
+         oneofl labels >>= fun (i,it_opt) ->
          let it = match it_opt with
            | Some t -> [t]
            | None   -> [] in
-          return (Some (con, as_phrase (Ast.BrIf (as_phrase (Int32.of_int i))), I32Type::it)))
+         return (Some (con, as_phrase (Ast.BrIf (as_phrase (Int32.of_int i))), I32Type::it)))
 
 (*** BrTable ***)
 (** brtable_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and brtable_gen (con: context_) t_opt size =
-  let labels = get_indexes_and_inputs t_opt con.labels in
-  if labels = []
-  then Gen.return None
-  else
-    Gen.(oneofl labels >>= fun (i,it_opt) ->
+  Gen.(get_indexes_and_inputs t_opt con.labels >>= fun labels ->
+       if labels = []
+       then return None
+       else
+         oneofl labels >>= fun (i,it_opt) ->
          let it = match it_opt with
            | Some t -> [t]
            | None   -> [] in
          list (oneofl labels >>= fun (i',it_opt') ->
                return (as_phrase (Int32.of_int i'))) >>= fun ilist ->
-         return (Some (con, as_phrase (Ast.BrTable (ilist, (as_phrase (Int32.of_int i)))), I32Type::it)) )
+         return (Some (con, as_phrase (Ast.BrTable (ilist, (as_phrase (Int32.of_int i)))), I32Type::it)))
 
 (*** Return ***)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
