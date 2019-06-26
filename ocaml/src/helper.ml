@@ -68,21 +68,20 @@ let types_ = [
 
 (** get_indexes: 'a -> 'a list -> int list **)
 let get_indexes a l =
-  let rec get_index a' l' i = match l' with
+  let rec get_index l i = match l with
     | [] -> []
-    | e::es ->
-      if e = a'
-      then i::(get_index a' es (i+1))
-      else (get_index a' es (i+1)) in
-  get_index a l 0
+    | e::l' ->
+      if e = a
+      then i::(get_index l' (i+1))
+      else get_index l' (i+1) in
+  get_index l 0
 
 let typeToString = Types.string_of_value_type
 
 let mToString = function
-  | None   -> "None"
-  | Some m -> (match m with 
-    | Types.Mutable   -> "Mutable"
-    | Types.Immutable -> "Immutable")
+  | None -> "None"
+  | Some Types.Mutable   -> "Mutable"
+  | Some Types.Immutable -> "Immutable"
 
 (** get_global_indexes: a' -> a list -> int list **)
 let get_global_indexes t (l: globals_) m = match t with 
@@ -107,30 +106,30 @@ let get_global_indexes t (l: globals_) m = match t with
 
 (** get_random_element: 'a -> ('b * 'a) list -> 'b option Gen.t **)
 let get_random_element a l =
-  let rec get_index a' l' = match l' with
+  let rec get_index l = match l with
     | [] -> []
-    | (fst,snd)::es ->
-      if snd = a'
-      then fst::(get_index a' es)
-      else get_index a' es in
-  let type_list = get_index a l in
+    | (fst,snd)::l' ->
+      if snd = a
+      then fst::(get_index l')
+      else get_index l' in
+  let type_list = get_index l in
   if type_list = []
   then Gen.return None
   else Gen.(map (fun t -> Some t) (oneofl type_list))
 
-(** get_indexes_and_inputs: a' -> ('b * 'a) list -> (int * stack_type) list Gen.t **)
+(** get_indexes_and_inputs: 'a -> ('b * 'a) list -> (int * stack_type) list Gen.t **)
 let get_indexes_and_inputs a l =
-  let rec get_index_ot a' b' l' i = match l' with
+  let rec get_index_ot b l' i = match l' with
     | [] -> []
     | (fst,snd)::es ->
-      if snd = a' && fst = b'
-      then (i,snd)::(get_index_ot a' b' es (i+1))
-      else           get_index_ot a' b' es (i+1) in
+      if snd = a && fst = b
+      then (i,snd)::(get_index_ot b es (i+1))
+      else           get_index_ot b es (i+1) in
   Gen.(get_random_element a l >>= function  (* Why does this req. generation? *)
-    | Some t -> return (get_index_ot a t l 0)
+    | Some t -> return (get_index_ot t l 0)
     | None   -> return [])
 
-let get_findex t_opt elems = 
+let get_findex t_opt elems =
   let rec indices il eindex =
     try 
       let elem = elems.(eindex) in
