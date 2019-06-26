@@ -25,7 +25,6 @@ TMP_JSC="$TMP_DIR/tmp_jsc"
 TMP_SM="$TMP_DIR/tmp_sm"
 TMP_V8="$TMP_DIR/tmp_v8"
 
-
 TMP_CH_JSC="$TMP_DIR/tmp_cmp_ch_jsc"
 TMP_JSC_SM="$TMP_DIR/tmp_cmp_jsc_sm"
 TMP_SM_V8="$TMP_DIR/tmp_cmp_sm_v8"
@@ -54,16 +53,16 @@ if [ "$#" -eq 2 ]
 then
     STAT_NODE="$STAT_DIR/$2node_time"
 
-    /usr/bin/time -f "%E" -a -o "$STAT_NODE" node ../javascript/convert.js "$WASM_FILE" "ch" > "$JS_CH_FILE" 2> "$ERROR_FILE"
+    /usr/bin/time -f "%E" -a -o "$STAT_NODE" node ../javascript/convert.js "$WASM_FILE" "ch"  > "$JS_CH_FILE"  2> "$ERROR_FILE"
     /usr/bin/time -f "%E" -a -o "$STAT_NODE" node ../javascript/convert.js "$WASM_FILE" "jsc" > "$JS_JSC_FILE" 2> "$ERROR_FILE"
-    /usr/bin/time -f "%E" -a -o "$STAT_NODE" node ../javascript/convert.js "$WASM_FILE" "sm" > "$JS_SM_FILE" 2> "$ERROR_FILE"
-    /usr/bin/time -f "%E" -a -o "$STAT_NODE" node ../javascript/convert.js "$WASM_FILE" "v8" > "$JS_V8_FILE" 2> "$ERROR_FILE"
+    /usr/bin/time -f "%E" -a -o "$STAT_NODE" node ../javascript/convert.js "$WASM_FILE" "sm"  > "$JS_SM_FILE"  2> "$ERROR_FILE"
+    /usr/bin/time -f "%E" -a -o "$STAT_NODE" node ../javascript/convert.js "$WASM_FILE" "v8"  > "$JS_V8_FILE"  2> "$ERROR_FILE"
 
 else
-    node ../javascript/convert.js "$WASM_FILE" "ch" > "$JS_CH_FILE" 2> "$ERROR_FILE"
+    node ../javascript/convert.js "$WASM_FILE" "ch"  > "$JS_CH_FILE"  2> "$ERROR_FILE"
     node ../javascript/convert.js "$WASM_FILE" "jsc" > "$JS_JSC_FILE" 2> "$ERROR_FILE"
-    node ../javascript/convert.js "$WASM_FILE" "sm" > "$JS_SM_FILE" 2> "$ERROR_FILE"
-    node ../javascript/convert.js "$WASM_FILE" "v8" > "$JS_V8_FILE" 2> "$ERROR_FILE"
+    node ../javascript/convert.js "$WASM_FILE" "sm"  > "$JS_SM_FILE"  2> "$ERROR_FILE"
+    node ../javascript/convert.js "$WASM_FILE" "v8"  > "$JS_V8_FILE"  2> "$ERROR_FILE"
 fi
 
 ERROR=$?

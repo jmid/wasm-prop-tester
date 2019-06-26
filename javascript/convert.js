@@ -15,8 +15,19 @@ const error_unreachable = 'unreachable';
 const error_stack = 'stack';
 const error_data_segment = 'data segment';
 
-console.log("var debug = debug || (arg => console.log('-->', arg));");
-console.log("let unrepresentable_re = /(unrepresentable)/i;");
+console.log(
+`var debug = debug || (arg => console.log('-->', arg));
+function debugfl (f) {
+    let s = f.toString();
+    let slen = s.length;
+    if (s.includes('.') && slen > 17) {
+	debug(s.slice(0,slen-1));
+    } else {
+	debug(s);
+    }
+}
+let unrepresentable_re = /(unrepresentable)/i;
+`);
 
 switch(process.argv[3]) {
     case "ch":
@@ -26,7 +37,7 @@ let overflow_re = /(overflow)/i;
 let unreachable_re = /(Unreachable Code)/i;
 let stack_re = /(Out of stack space)/i;
 let data_segment_re = /(Data segment is out of range)/i;
-`)
+`);
       break;
     case "jsc":
       console.log(
@@ -57,15 +68,15 @@ let data_segment_re = /(data segment is out of bounds)/i;
         break;
   } 
 
-console.log("let importObject = { imports: { log: debug } };");
+console.log("let importObject = { imports: { log: debug, logfl: debugfl } };");
 console.log("let buffer = new Uint8Array(\[", b.toString(), "]);");
 console.log(
 `
 try {
      let m = new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject);
      debug(m.exports.runi32());
-     debug(m.exports.runf32());
-     debug(m.exports.runf64());
+     debugfl(m.exports.runf32());
+     debugfl(m.exports.runf64());
 } catch(e) {
      if (zero_div_re.exec(e.message)) debug('" + error_int_zero_div + "')
      else if (unreachable_re.exec(e.message)) debug('" + error_unreachable + "')

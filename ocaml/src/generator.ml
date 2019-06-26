@@ -363,9 +363,10 @@ let module_gen = Gen.(
             rec_func_gen con [] (outtypes@ftypelist) 3 >>= fun funcs ->
                 let imports_str = string_to_name "imports" in
                 let log_str     = string_to_name "log" in
-                let mk_func_import i =
+                let logfl_str   = string_to_name "logfl" in
+                let mk_func_import s i =
                   as_phrase { Ast.module_name = imports_str;
-                              Ast.item_name = log_str;
+                              Ast.item_name = s;
                               Ast.idesc = as_phrase (Ast.FuncImport (as_phrase i))
                             } in
                 let mk_func_export s i =
@@ -382,9 +383,9 @@ let module_gen = Gen.(
                   Ast.elems = elems_to_ast_elems es;
                   Ast.data  = con.data;
                   Ast.imports =
-                    [ mk_func_import 0l;
-                      mk_func_import 1l;
-                      mk_func_import 2l; ];
+                    [ mk_func_import log_str 0l;
+                      mk_func_import logfl_str 1l;
+                      mk_func_import logfl_str 2l; ];
                   Ast.exports =
                     [ mk_func_export "runi32" 4l;
                       mk_func_export "runf32" 5l;
@@ -608,7 +609,9 @@ let stack_test =
 (* QCheck_runner.set_seed(416362809);; *)
 (* QCheck_runner.set_seed(393719003);; *)
 (* QCheck_runner.set_seed(294956219);; *)
-QCheck_runner.run_tests ~verbose:true [ implementations_test; (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
+(*QCheck_runner.run_tests ~verbose:true*)
+QCheck_runner.run_tests_main
+  [ implementations_test; (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
 
 (*
 ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)]
