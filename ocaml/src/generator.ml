@@ -73,12 +73,13 @@ let value_type_opt_gen = Gen.(
 ;;
 
 (** stack_type_gen : int -> value_type list **)
-let stack_type_gen n = Gen.(list_repeat n (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] ))
+let stack_type_gen n =
+  Gen.(list_repeat n (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] ))
 ;;
 
 (** func_type_gen : func_type **)
-let func_type_gen = Gen.(int_bound 10 >>= fun n ->
-  pair (stack_type_gen n) (value_type_opt_gen))
+let func_type_gen =
+  Gen.(int_bound 10 >>= fun n -> pair (stack_type_gen n) (value_type_opt_gen))
 ;;
 
 (** func_type_list_gen : func_type list **)
@@ -98,7 +99,7 @@ let process_funcs con flist index =
         | Some _        -> funcs
         ) in
         process_flist funcs' (i+1) rst
-      ) in    
+      ) in
       let funcs_ = process_flist con.funcs index flist in
         { con with funcs = funcs_; }
 
@@ -218,6 +219,7 @@ exception Type_not_expected of string;;
 let process_globals con gtypelist =
   let rec rec_glob_process globals glist index =
     match glist with
+      | []     -> globals
       | g::rst ->
         let nglobals (t, m, inst) =
           (match t with
@@ -240,7 +242,6 @@ let process_globals con gtypelist =
             | _ -> raise (Type_not_expected "")
             ) in
         rec_glob_process (nglobals g) rst (index + 1)
-      | []     -> globals
   in
   let globals' = rec_glob_process con.globals gtypelist 0 in
   { con with globals = globals'; }

@@ -188,18 +188,22 @@ and floatOp_unop_gen =
 
 (** unop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and unop_gen con t_opt size = match t_opt with
-  | Some I32Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I32 op)), [I32Type])))
-    intOp_unop_gen
-  | Some I64Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I64 op)), [I64Type])))
-    intOp_unop_gen
-  | Some F32Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F32 op)), [F32Type])))
-    floatOp_unop_gen
-  | Some F64Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F64 op)), [F64Type])))
-    floatOp_unop_gen
+  | Some I32Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I32 op)), [I32Type])))
+      intOp_unop_gen
+  | Some I64Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I64 op)), [I64Type])))
+      intOp_unop_gen
+  | Some F32Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F32 op)), [F32Type])))
+      floatOp_unop_gen
+  | Some F64Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F64 op)), [F64Type])))
+      floatOp_unop_gen
   | Some _ | None -> Gen.return None
 
 (*** Binary operations ***)
@@ -218,18 +222,22 @@ and floatOp_binop_gen =
 
 (** binop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and binop_gen con t_opt size = match t_opt with
-  | Some I32Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Binary (Values.I32 op)), [I32Type; I32Type])))
-    intOp_binop_gen
-  | Some I64Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Binary (Values.I64 op)), [I64Type; I64Type])))
-    intOp_binop_gen
-  | Some F32Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Binary (Values.F32 op)), [F32Type; F32Type])))
-    floatOp_binop_gen
-  | Some F64Type -> Gen.map
-    (fun op -> (Some (con, as_phrase (Ast.Binary (Values.F64 op)), [F64Type; F64Type])))
-    floatOp_binop_gen
+  | Some I32Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.I32 op)), [I32Type; I32Type])))
+      intOp_binop_gen
+  | Some I64Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.I64 op)), [I64Type; I64Type])))
+      intOp_binop_gen
+  | Some F32Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.F32 op)), [F32Type; F32Type])))
+      floatOp_binop_gen
+  | Some F64Type ->
+    Gen.map
+      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.F64 op)), [F64Type; F64Type])))
+      floatOp_binop_gen
   | Some _ | None -> Gen.return None
 
 (*** Test operations ***)
@@ -317,15 +325,16 @@ and cvtop_gen con t_opt size = match t_opt with
 (** drop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and drop_gen con t_opt size = match t_opt with
 | Some _ -> Gen.return None
-| None   -> Gen.(map
-  (fun t -> Some (con, as_phrase (Ast.Drop), [t]))
-  (oneofl [I32Type; I64Type; F32Type; F64Type]))
+| None   ->
+  Gen.(map
+         (fun t -> Some (con, as_phrase Ast.Drop, [t]))
+         (oneofl [I32Type; I64Type; F32Type; F64Type]))
 
 (*** Select ***)
 (** select_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and select_gen con t_opt size = match t_opt with
   | None   -> Gen.return None
-  | Some t -> Gen.return (Some (con, as_phrase (Ast.Select), [I32Type; t; t]))
+  | Some t -> Gen.return (Some (con, as_phrase Ast.Select, [I32Type; t; t]))
 
 (**** Variable Instructions ****)
 
@@ -490,8 +499,8 @@ and block_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (t_opt, t_opt) con) ot (size/2) >>=
     function
-      | Some instrs -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, (List.rev instrs))), []))
-      | None        -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, [])), [])) )
+      | Some instrs -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, List.rev instrs)), []))
+      | None        -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, [])), [])))
 
 (*** Loop ***)
 (** loop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -502,8 +511,8 @@ and loop_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (None, t_opt) con) ot (size/2) >>=
     function
-      | Some instrs -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, (List.rev instrs))), []))
-      | None        -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, [])), [])) )
+      | Some instrs -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, List.rev instrs)), []))
+      | None        -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, [])), [])))
 
 (*** If ***)
 (** if_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -521,7 +530,7 @@ and if_gen (con: context_) t_opt size =
         let instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some (con, as_phrase (Ast.If (to_stack_type ot, (List.rev instrs1), (List.rev instrs2))), [I32Type])) )
+        return (Some (con, as_phrase (Ast.If (to_stack_type ot, List.rev instrs1, List.rev instrs2)), [I32Type])))
 
 (*** Br ***)
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -592,7 +601,7 @@ and call_gen (con: context_) t_opt size =
     else
       Gen.(
         oneofl ilist' >>= fun (i, tl') ->
-          return (Some (con, as_phrase (Ast.Call (as_phrase (Int32.of_int i))), (List.rev tl')))
+          return (Some (con, as_phrase (Ast.Call (as_phrase (Int32.of_int i))), List.rev tl'))
       )
 
 (*** CallIndirect ***)
@@ -611,8 +620,7 @@ and callindirect_gen (con: context_) t_opt size =
             | Some ftype ->
               return (Some (con,
                             as_phrase (Ast.CallIndirect (as_phrase (Int32.of_int i))),
-                            (TableIndex idx)::(List.rev (fst ftype))))
-      )
+                            (TableIndex idx)::(List.rev (fst ftype)))))
 
 let instr_gen context types = Gen.sized (instrs_rule context (snd types))
   (* Gen.(sized_size (int_bound 500) (fun n ->
