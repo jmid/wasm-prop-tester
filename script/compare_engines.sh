@@ -31,6 +31,11 @@ TMP_SM_V8="$TMP_DIR/tmp_cmp_sm_v8"
 
 ERROR_FILE="$TMP_DIR/error"
 
+# Save previous result, to avoid last shrinking step overwriting it
+if [ -f "$WASM_FILE" ]
+then
+    cp -f "$WASM_FILE" "$TMP_DIR/prev.wasm"
+fi
 
 if [ "$#" -eq 2 ]
 then

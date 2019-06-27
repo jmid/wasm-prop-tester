@@ -398,7 +398,83 @@ let module_gen = Gen.(
 let module_printer (m : Wasm.Ast.module_' Wasm.Source.phrase) =
   Sexpr.to_string 80 (Arrange.module_ m)
 
-let arb_module = make ~print:module_printer module_gen
+let i32_shrink i =
+  if i = I32.zero then Iter.empty else Iter.return I32.zero
+(*  let c = (I32.div_s i (I32.of_int_s 2)) in
+    if c = i then Iter.empty else Iter.return c *)
+
+let i64_shrink i =
+  if i = I64.zero then Iter.empty else Iter.return I64.zero
+(*  let c = (I64.div_s i (I64.of_int_s 2)) in
+    if c = i then Iter.empty else Iter.return c *)
+
+let rec instr_list_shrink is = match is with
+  | [] -> Iter.empty
+  | i::is ->
+    Iter.(
+      (match is with
+       | [] -> Iter.empty
+       | j::is -> (match i.Source.it,j.Source.it with
+           | Ast.Const _, Ast.LocalSet _
+           | Ast.Const _, Ast.GlobalSet _
+           | Ast.GlobalGet _, Ast.GlobalSet _
+           | Ast.LocalGet _ , Ast.LocalSet _
+           | Ast.GlobalGet _, Ast.LocalSet _
+           | Ast.LocalGet _ , Ast.GlobalSet _ -> Iter.return is
+           | _, _ -> Iter.empty))
+      <+>
+      (match i.Source.it with
+       | Ast.Nop
+       | Ast.LocalTee _ -> return is
+       | Ast.Block (sts,is') ->
+         map (fun is'' -> as_phrase (Ast.Block (sts,is''))::is) (instr_list_shrink is')
+       | Ast.Loop (sts,is') ->
+         map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink is')
+       | Ast.If (sts,is1,is2) ->
+         (map (fun is' -> as_phrase (Ast.If (sts,is',is2))::is) (instr_list_shrink is1))
+         <+>
+         (map (fun is' -> as_phrase (Ast.If (sts,is1,is'))::is) (instr_list_shrink is2))
+       | Ast.BrTable (vs,v) ->
+         map (fun vs' -> as_phrase (Ast.BrTable (vs',v))::is) (Shrink.list vs)
+       | Ast.Const l -> (match l.Source.it with
+           | Values.I32 i ->
+             map (fun j -> as_phrase (Ast.Const (as_phrase (Values.I32 j)))::is) (i32_shrink i)
+           | Values.I64 i ->
+             map (fun j -> as_phrase (Ast.Const (as_phrase (Values.I64 j)))::is) (i64_shrink i)
+           | Values.F32 f -> Iter.empty
+           | Values.F64 f -> Iter.empty)
+       | _ -> empty)
+      <+>
+      map (fun is' -> i::is') (instr_list_shrink is)
+    )
+(*
+and instr_shrink i = match i with
+  | Ast.Block (sts,is) -> Iter.map (fun is' -> Ast.Block (sts,is')) (instr_list_shrink is)
+  | Ast.Loop (sts,is) -> Iter.map (fun is' -> Ast.Loop (sts,is')) (instr_list_shrink is)
+  | _ -> Iter.empty
+*)
+let func_shrink f =
+  Iter.map
+    (fun body' -> as_phrase { f.Source.it with Ast.body = body'})
+    (instr_list_shrink f.Source.it.Ast.body)
+
+let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
+  let module_valid m = try Valid.check_module m; true with Valid.Invalid (_,_) -> false in
+  Shrink.filter module_valid
+    (fun (m : Wasm.Ast.module_' Wasm.Source.phrase) ->
+       Iter.(
+         map
+           (fun fs -> as_phrase { m.it with Ast.funcs = fs })
+           (Shrink.list ~shrink:func_shrink m.it.Ast.funcs)
+         <+>
+         map (fun ds -> as_phrase { m.it with Ast.data = ds }) (Shrink.list m.it.Ast.data)
+         <+>
+         map (fun gs -> as_phrase { m.it with Ast.globals = gs }) (Shrink.list m.it.Ast.globals)
+         <+>
+         map (fun es -> as_phrase { m.it with Ast.elems = es }) (Shrink.list m.it.Ast.elems)
+     ))
+
+let arb_module = make ~print:module_printer ~shrink:module_shrink module_gen
 
 let stat_dir_name = "stat";;
 
@@ -465,7 +541,7 @@ let stat_to_file m =
     close_out oc;;
 
 let implementations_test =
-  Test.make ~name:"Implementations" ~count:10000
+  Test.make ~name:"Implementations" ~count:100 (*10000*)
   arb_module
   (function m ->
     module_to_wat m wat_file_name;
@@ -624,8 +700,8 @@ let stack_test =
 (*QCheck_runner.run_tests ~verbose:true*)
 QCheck_runner.run_tests_main
   [
-    output_validates_test;
-    (*implementations_test;*)
+    (*output_validates_test;*)
+    implementations_test;
 
     (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
 
