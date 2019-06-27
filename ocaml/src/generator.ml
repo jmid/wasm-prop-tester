@@ -473,6 +473,17 @@ let implementations_test =
   )
 ;;
 
+let output_validates_test =
+  Test.make ~name:"output validates" ~count:1000
+  arb_module
+  (function m ->
+     (* try *)
+       Valid.check_module m;
+       true
+     (*with (Valid.Invalid (r,str)) -> false *)
+  )
+;;
+
 let implementations_stat_test =
   Test.make ~name:"Stats" ~count:1000
   arb_module
@@ -612,7 +623,11 @@ let stack_test =
 (* QCheck_runner.set_seed(294956219);; *)
 (*QCheck_runner.run_tests ~verbose:true*)
 QCheck_runner.run_tests_main
-  [ implementations_test; (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
+  [
+    output_validates_test;
+    (*implementations_test;*)
+
+    (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
 
 (*
 ~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)]
