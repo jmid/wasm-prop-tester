@@ -413,6 +413,14 @@ let split n xs =
     | _,y::ys -> walk (n-1) (y::xs) ys in
   walk n [] xs
 
+(* a size-preserving list-shrinker *)
+let rec shrink_list_elements ~shrink xs = match xs with
+  | [] -> Iter.empty
+  | x::xs ->
+    Iter.(map (fun x' -> x'::xs) (shrink x)
+          <+>
+          map (fun xs -> x::xs) (shrink_list_elements ~shrink xs))
+
 let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
   let module_valid m = try Valid.check_module m; true with Valid.Invalid (_,_) -> false in
   Shrink.filter module_valid
@@ -420,7 +428,11 @@ let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
        Iter.(
          let fixed,rest = split 7 m.it.Ast.funcs in (* 3 imports, start, 3 exports *)
          map
-           (fun fs -> as_phrase { m.it with Ast.funcs = fixed@fs })
+           (fun fixed' -> as_phrase { m.it with Ast.funcs = fixed'@rest })
+           (shrink_list_elements ~shrink:func_shrink fixed)
+         <+>
+         map
+           (fun rest' -> as_phrase { m.it with Ast.funcs = fixed@rest' })
            (Shrink.list ~shrink:func_shrink rest (*m.it.Ast.funcs*))
          <+>
          map (fun ds -> as_phrase { m.it with Ast.data = ds }) (Shrink.list m.it.Ast.data)
