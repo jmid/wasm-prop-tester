@@ -406,14 +406,22 @@ let global_shrink gs g =
     get_global_indexes g'.Ast.gtype 
 *)
 
+let split n xs =
+  let rec walk n xs ys = match n,ys with
+    | 0,_     -> List.rev xs, ys
+    | _,[]    -> List.rev xs, ys
+    | _,y::ys -> walk (n-1) (y::xs) ys in
+  walk n [] xs
+
 let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
   let module_valid m = try Valid.check_module m; true with Valid.Invalid (_,_) -> false in
   Shrink.filter module_valid
     (fun (m : Wasm.Ast.module_' Wasm.Source.phrase) ->
        Iter.(
+         let fixed,rest = split 7 m.it.Ast.funcs in (* 3 imports, start, 3 exports *)
          map
-           (fun fs -> as_phrase { m.it with Ast.funcs = fs })
-           (Shrink.list ~shrink:func_shrink m.it.Ast.funcs)
+           (fun fs -> as_phrase { m.it with Ast.funcs = fixed@fs })
+           (Shrink.list ~shrink:func_shrink rest (*m.it.Ast.funcs*))
          <+>
          map (fun ds -> as_phrase { m.it with Ast.data = ds }) (Shrink.list m.it.Ast.data)
          <+>
