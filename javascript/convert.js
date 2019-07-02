@@ -16,15 +16,15 @@ const error_stack = 'stack';
 const error_data_segment = 'data segment';
 
 console.log(
-`var debug = debug || (arg => console.log('-->', arg));
-function debugfl (f) {
+`function printfl (f) {
     let s = f.toString();
     let slen = s.length;
-    if (s.includes('.') && slen > 17) {
-//	debug(s.slice(0,slen-1));
-	debug(f.toFixed(13));
+    if (s.includes('.') && slen > 16) {
+//	print(s.slice(0,slen-1));
+//	print(f.toFixed(12));
+	print(f.toFixed(14 - s.indexOf('.')));
     } else {
-	debug(s);
+	print(s);
     }
 }
 let unrepresentable_re = /(unrepresentable)/i;
@@ -69,22 +69,22 @@ let data_segment_re = /(data segment is out of bounds)/i;
         break;
   } 
 
-console.log("let importObject = { imports: { log: debug, logfl: debugfl } };");
+console.log("let importObject = { imports: { log: print, logfl: printfl } };");
 console.log("let buffer = new Uint8Array(\[", b.toString(), "]);");
 console.log(
 `
 try {
      let m = new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject);
-     debug(m.exports.runi32());
-     debugfl(m.exports.runf32());
-     debugfl(m.exports.runf64());
+     print(m.exports.runi32());
+     printfl(m.exports.runf32());
+     printfl(m.exports.runf64());
 } catch(e) {
-     if (zero_div_re.exec(e.message)) debug('" + error_int_zero_div + "')
-     else if (unreachable_re.exec(e.message)) debug('" + error_unreachable + "')
-     else if (stack_re.exec(e.message)) debug('" + error_stack + "')
-     else if (overflow_re.exec(e.message)) debug('" + error_overflow + "')
-     else if (unrepresentable_re.exec(e.message)) debug('" + error_overflow + "')
-     else if (data_segment_re.exec(e.message)) debug('" + error_data_segment + "')
-     else debug(e)
+     if (zero_div_re.exec(e.message)) print('" + error_int_zero_div + "')
+     else if (unreachable_re.exec(e.message)) print('" + error_unreachable + "')
+     else if (stack_re.exec(e.message)) print('" + error_stack + "')
+     else if (overflow_re.exec(e.message)) print('" + error_overflow + "')
+     else if (unrepresentable_re.exec(e.message)) print('" + error_overflow + "')
+     else if (data_segment_re.exec(e.message)) print('" + error_data_segment + "')
+     else print(e)
 }
 `);
