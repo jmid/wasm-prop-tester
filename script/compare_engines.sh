@@ -31,12 +31,6 @@ TMP_SM_V8="$TMP_DIR/tmp_cmp_sm_v8"
 
 ERROR_FILE="$TMP_DIR/error"
 
-# Save previous result, to avoid last shrinking step overwriting it
-if [ -f "$WASM_FILE" ]
-then
-    cp -f "$WASM_FILE" "$TMP_DIR/prev.wasm"
-fi
-
 if [ "$#" -eq 2 ]
 then
     STAT_DIR="stat"
@@ -98,10 +92,10 @@ then
     fi
 else 
 
-    timeout 10 ch "$JS_CH_FILE" > $TMP_CH 2>&1
-    timeout 10 jsc "$JS_JSC_FILE" > $TMP_JSC 2>&1
-    timeout 10 sm "$JS_SM_FILE" > $TMP_SM 2>&1
-    timeout 10 v8 "$JS_V8_FILE" > $TMP_V8 2>&1
+    timeout 10 ch "$JS_CH_FILE" > "$TMP_CH" 2>&1
+    timeout 10 jsc "$JS_JSC_FILE" > "$TMP_JSC" 2>&1
+    timeout 10 sm "$JS_SM_FILE" > "$TMP_SM" 2>&1
+    timeout 10 v8 "$JS_V8_FILE" > "$TMP_V8" 2>&1
 
 fi
 
@@ -111,6 +105,18 @@ cmp -n 5000 $TMP_SM $TMP_V8 > $TMP_SM_V8 2>&1
 
 if [ -s "$TMP_CH_JSC" ] || [ -s "$TMP_JSC_SM" ] || [ -s "$TMP_SM_V8" ]
 then
+  # Save diff result, to avoid last shrinking step overwriting it
+  cp -f "$WAT_FILE"  "$TMP_DIR/prev.wat"
+  cp -f "$WASM_FILE" "$TMP_DIR/prev.wasm"
+  cp -f "$JS_CH_FILE"  "$TMP_DIR/prev_ch.js"
+  cp -f "$JS_JSC_FILE" "$TMP_DIR/prev_jsc.js"
+  cp -f "$JS_SM_FILE"  "$TMP_DIR/prev_sm.js"
+  cp -f "$JS_V8_FILE"  "$TMP_DIR/prev_v8.js"
+  cp -f "$TMP_CH"  "$TMP_DIR/prev_ch"
+  cp -f "$TMP_JSC" "$TMP_DIR/prev_jsc"
+  cp -f "$TMP_SM"  "$TMP_DIR/prev_sm"
+  cp -f "$TMP_V8"  "$TMP_DIR/prev_v8"
+  cp -f "$ERROR_FILE" "$TMP_DIR/prev_error"
   exit 1
 else
   exit 0
