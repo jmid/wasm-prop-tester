@@ -60,33 +60,75 @@ let rec instrs_rule context output_ts size =
 and instr_rule con t_opt size =
   let rules = match t_opt with
     | None   -> (match size with
-      | 0 -> [(1, nop_gen con t_opt size); (1, localSet_gen con t_opt size); (1, globalSet_gen con t_opt size);]
-      | n -> [(1, nop_gen con t_opt size); (1, drop_gen con t_opt size); (1, block_gen con t_opt size);
-              (1, loop_gen con t_opt size); (1, localSet_gen con t_opt size); (1, globalSet_gen con t_opt size);
-              (1, call_gen con t_opt size); (1, store_gen con t_opt size); (1, store_gen con t_opt size);])
+        | 0 ->
+          [(1, nop_gen con t_opt size);
+           (1, localSet_gen con t_opt size);
+           (1, globalSet_gen con t_opt size);]
+        | n ->
+          [(1, nop_gen con t_opt size);
+           (1, drop_gen con t_opt size);
+           (1, block_gen con t_opt size);
+           (1, loop_gen con t_opt size);
+           (1, localSet_gen con t_opt size);
+           (1, globalSet_gen con t_opt size);
+           (1, call_gen con t_opt size);
+           (1, store_gen con t_opt size);
+           (1, store_gen con t_opt size);])
     | Some t -> (match size with
-      | 0 -> [(1, const_gen con t_opt size); (1, localGet_gen con t_opt size); (1, globalGet_gen con t_opt size);]
-      | n -> (match t with
-        | I32Type      -> [(1, const_gen con t_opt size); (1, unop_gen con t_opt size); (1, binop_gen con t_opt size);
-                           (1, testop_gen con t_opt size); (1, relop_gen con t_opt size); (1, cvtop_gen con t_opt size);
-                           (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
-                           (1, if_gen con t_opt size); (1, select_gen con t_opt size); (1, localGet_gen con t_opt size);
-                           (1, localTee_gen con t_opt size); (1, globalGet_gen con t_opt size);
-                           (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (1, br_gen con t_opt size);
-                           (1, brif_gen con t_opt size); (1, brtable_gen con t_opt size);
-                           (11, call_gen con t_opt size); (1, callindirect_gen con t_opt size);
-                           (1, memorysize_gen con t_opt size); (1, memorygrow_gen con t_opt size);]
-        | I64Type | F32Type | F64Type ->
-                          [(1, const_gen con t_opt size); (1, unop_gen con t_opt size); (1, binop_gen con t_opt size);
-                            (1, cvtop_gen con t_opt size);
-                            (1, nop_gen con t_opt size); (1, block_gen con t_opt size); (1, loop_gen con t_opt size);
-                            (1, if_gen con t_opt size); (1, select_gen con t_opt size); (1, localGet_gen con t_opt size);
-                            (1, localTee_gen con t_opt size); (1, globalGet_gen con t_opt size);
-                            (1, unreachable_gen con t_opt size); (1, return_gen con t_opt size); (1, br_gen con t_opt size);
-                            (1, brif_gen con t_opt size); (1, brtable_gen con t_opt size);
-                            (11, call_gen con t_opt size); (1, callindirect_gen con t_opt size);
-                            (1, memorysize_gen con t_opt size); (1, memorygrow_gen con t_opt size);]
-        | MemIndexType | TableIndex _ ->  [(1, const_gen con t_opt size);]))
+        | 0 ->
+          [(1, const_gen con t_opt size);
+           (1, localGet_gen con t_opt size);
+           (1, globalGet_gen con t_opt size);]
+        | n -> (match t with
+            | I32Type      ->
+              [(1, const_gen con t_opt size);
+               (1, unop_gen con t_opt size);
+               (1, binop_gen con t_opt size);
+               (1, testop_gen con t_opt size);
+               (1, relop_gen con t_opt size);
+               (1, cvtop_gen con t_opt size);
+               (1, nop_gen con t_opt size);
+               (1, block_gen con t_opt size);
+               (1, loop_gen con t_opt size);
+               (1, if_gen con t_opt size);
+               (1, select_gen con t_opt size);
+               (1, localGet_gen con t_opt size);
+               (1, localTee_gen con t_opt size);
+               (1, globalGet_gen con t_opt size);
+               (1, unreachable_gen con t_opt size);
+               (1, return_gen con t_opt size);
+               (1, br_gen con t_opt size);
+               (1, brif_gen con t_opt size);
+               (1, brtable_gen con t_opt size);
+               (11, call_gen con t_opt size);
+               (1, callindirect_gen con t_opt size);
+               (1, memorysize_gen con t_opt size);
+               (1, memorygrow_gen con t_opt size);]
+            | I64Type | F32Type | F64Type ->
+              [(1, const_gen con t_opt size);
+               (1, unop_gen con t_opt size);
+               (1, binop_gen con t_opt size);
+               (1, cvtop_gen con t_opt size);
+               (1, nop_gen con t_opt size);
+               (1, block_gen con t_opt size);
+               (1, loop_gen con t_opt size);
+               (1, if_gen con t_opt size);
+               (1, select_gen con t_opt size);
+               (1, localGet_gen con t_opt size);
+               (1, localTee_gen con t_opt size);
+               (1, globalGet_gen con t_opt size);
+               (1, unreachable_gen con t_opt size);
+               (1, return_gen con t_opt size);
+               (1, br_gen con t_opt size);
+               (1, brif_gen con t_opt size);
+               (1, brtable_gen con t_opt size);
+               (11, call_gen con t_opt size);
+               (1, callindirect_gen con t_opt size);
+               (1, memorysize_gen con t_opt size);
+               (1, memorygrow_gen con t_opt size);]
+            | MemIndexType
+            | TableIndex _ ->
+              [(1, const_gen con t_opt size);]))
   in generate_rule rules
 
 and generate_rule rules =
@@ -120,9 +162,9 @@ and const_gen con t_opt size = match t_opt with
   | None -> Gen.return None
   | Some I32Type -> Gen.(
       let corner_gen =
-        oneofl [ 0x7fffffffl; 0x80000000l; 0x80000001l; 0x00000000l; 0x3fffffffl;
-                 0x01234567l; 0x8ff00ff0l; 0x40000000l; 0xabcd9876l; 0xfe00dc00l;
-                 0xb0c1d2e3l; 0x769abcdfl ] in
+        oneofl [ 0x7fffffffl; 0x80000000l; 0x80000001l; 0x00000000l;
+                 0x3fffffffl; 0x01234567l; 0x8ff00ff0l; 0x40000000l;
+                 0xabcd9876l; 0xfe00dc00l; 0xb0c1d2e3l; 0x769abcdfl ] in
       map
       (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 i))), []))
       (frequency [ 2, corner_gen; 2, ui32; ])
