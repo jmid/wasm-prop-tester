@@ -10,6 +10,7 @@ abstract syntax tree (in OCaml).
 ## External Dependencies
 
 * A `timeout` command
+  (on Mac OSX, install coreutils, then, e.g., `ln -s /opt/local/bin/gtimeout ~/bin/timeout`
 
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
@@ -33,6 +34,6 @@ PATH="$PATH:$HOME/.jsvu"
 
 ## Issues Found
 
-* SpiderMonkey: [Crash when start function is added to table](https://bugzilla.mozilla.org/show_bug.cgi?id=1545086)
+* SpiderMonkey: [Crash when start function is added to table](https://bugzilla.mozilla.org/show_bug.cgi?id=1545086)  (new)
 
-* Chakra: [Compile-time rejection of unreachable tee_local](https://github.com/microsoft/ChakraCore/issues/6185)
+* Chakra: [Compile-time rejection of unreachable tee_local](https://github.com/microsoft/ChakraCore/issues/6185)  (known)
