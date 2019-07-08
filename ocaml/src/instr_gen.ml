@@ -9,33 +9,33 @@ let addLabel t_option con =
 type instr = instr' Source.phrase
 and instr' =
   | Unreachable                       (* trap unconditionally *)
-  | Return                            (* break from function body *)
   | Nop                               (* do nothing *)
   | Drop                              (* forget a value *)
   | Select                            (* branchless conditional *)
+  | Block of stack_type * instr list  (* execute in sequence *)
+  | Loop of stack_type * instr list   (* loop header *)
+  | If of stack_type * instr list * instr list  (* conditional *)
+  | Br of var                         (* break to n-th surrounding label *)
+  | BrIf of var                       (* conditional break *)
+  | BrTable of var list * var         (* indexed break *)
+  | Return                            (* break from function body *)
+  | Call of var                       (* call function *)
+  | CallIndirect of var               (* call function through table *)
+  | LocalGet of var                   (* read local variable *)
+  | LocalSet of var                   (* write local variable *)
+  | LocalTee of var                   (* write local variable and keep value *)
+  | GlobalGet of var                  (* read global variable *)
+  | GlobalSet of var                  (* write global variable *)
+  | Load of loadop                    (* read memory at address *)
+  | Store of storeop                  (* write memory at address *)
+  | MemorySize                        (* size of linear memory *)
+  | MemoryGrow                        (* grow linear memory *)
   | Const of literal                  (* constant *)
   | Test of testop                    (* numeric test *)
   | Compare of relop                  (* numeric comparison *)
   | Unary of unop                     (* unary numeric operator *)
   | Binary of binop                   (* binary numeric operator *)
   | Convert of cvtop                  (* conversion *)
-  | Block of stack_type * instr list  (* execute in sequence *)
-  | Loop of stack_type * instr list   (* loop header *)
-  | If of stack_type * instr list * instr list  (* conditional *)
-  | LocalGet of var                   (* read local variable *)
-  | LocalSet of var                   (* write local variable *)
-  | LocalTee of var                   (* write local variable and keep value *)
-  | Br of var                         (* break to n-th surrounding label *)
-  | BrIf of var                       (* conditional break *)
-  | BrTable of var list * var         (* indexed break *)
-  | GlobalGet of var                  (* read global variable *)
-  | GlobalSet of var                  (* write global variable *)
-  | Call of var                       (* call function *)
-  | CallIndirect of var               (* call function through table *)
-  | MemorySize                        (* size of linear memory *)
-  | MemoryGrow                        (* grow linear memory *)
-  | Load of loadop                    (* read memory at address *)
-  | Store of storeop                  (* write memory at address *)
 *)
 
 (*** Instructions list generator ***)
@@ -64,16 +64,15 @@ and instr_rule con t_opt size =
           [(1, nop_gen con t_opt size);
            (1, localSet_gen con t_opt size);
            (1, globalSet_gen con t_opt size);]
-        | n ->
+        | _ ->
           [(1, nop_gen con t_opt size);
-           (1, drop_gen con t_opt size);
+           (2, drop_gen con t_opt size);
            (1, block_gen con t_opt size);
            (1, loop_gen con t_opt size);
+           (1, call_gen con t_opt size);
            (1, localSet_gen con t_opt size);
            (1, globalSet_gen con t_opt size);
-           (1, call_gen con t_opt size);
-           (1, store_gen con t_opt size);
-           (1, store_gen con t_opt size);])
+           (6, store_gen con t_opt size);])
     | Some t -> (match size with
         | 0 ->
           [(1, const_gen con t_opt size);
@@ -81,51 +80,66 @@ and instr_rule con t_opt size =
            (1, globalGet_gen con t_opt size);]
         | n -> (match t with
             | I32Type      ->
-              [(1, const_gen con t_opt size);
-               (1, unop_gen con t_opt size);
-               (1, binop_gen con t_opt size);
-               (1, testop_gen con t_opt size);
-               (1, relop_gen con t_opt size);
-               (1, cvtop_gen con t_opt size);
+              [(8, unreachable_gen con t_opt size);
                (1, nop_gen con t_opt size);
+               (*(1, drop_gen con t_opt size);*)
+               (8, select_gen con t_opt size);
                (1, block_gen con t_opt size);
                (1, loop_gen con t_opt size);
-               (1, if_gen con t_opt size);
-               (1, select_gen con t_opt size);
+               (4, if_gen con t_opt size);
+               (6, br_gen con t_opt size);
+               (6, brif_gen con t_opt size);
+               (6, brtable_gen con t_opt size);
+               (6, return_gen con t_opt size);
+               (8, call_gen con t_opt size);
+               (10, callindirect_gen con t_opt size);
                (1, localGet_gen con t_opt size);
-               (1, localTee_gen con t_opt size);
+               (*(1, localSet_gen con t_opt size);*)
+               (8, localTee_gen con t_opt size);
                (1, globalGet_gen con t_opt size);
-               (1, unreachable_gen con t_opt size);
-               (1, return_gen con t_opt size);
-               (1, br_gen con t_opt size);
-               (1, brif_gen con t_opt size);
-               (1, brtable_gen con t_opt size);
-               (11, call_gen con t_opt size);
-               (1, callindirect_gen con t_opt size);
-               (1, memorysize_gen con t_opt size);
-               (1, memorygrow_gen con t_opt size);]
+               (*(1, globalSet_gen con t_opt size);*)
+               (*(1, load_gen con t_opt size);*)
+               (*(1, store_gen con t_opt size);*)
+               (10, memorysize_gen con t_opt size);
+               (10, memorygrow_gen con t_opt size);
+               (1, const_gen con t_opt size);
+               (8, testop_gen con t_opt size);
+               (8, compare_gen con t_opt size);
+               (4, unop_gen con t_opt size);
+               (4, binop_gen con t_opt size);
+               (4, cvtop_gen con t_opt size);
+              ]
             | I64Type | F32Type | F64Type ->
-              [(1, const_gen con t_opt size);
-               (1, unop_gen con t_opt size);
-               (1, binop_gen con t_opt size);
-               (1, cvtop_gen con t_opt size);
-               (1, nop_gen con t_opt size);
-               (1, block_gen con t_opt size);
-               (1, loop_gen con t_opt size);
-               (1, if_gen con t_opt size);
-               (1, select_gen con t_opt size);
-               (1, localGet_gen con t_opt size);
-               (1, localTee_gen con t_opt size);
-               (1, globalGet_gen con t_opt size);
-               (1, unreachable_gen con t_opt size);
-               (1, return_gen con t_opt size);
-               (1, br_gen con t_opt size);
-               (1, brif_gen con t_opt size);
-               (1, brtable_gen con t_opt size);
-               (11, call_gen con t_opt size);
-               (1, callindirect_gen con t_opt size);
-               (1, memorysize_gen con t_opt size);
-               (1, memorygrow_gen con t_opt size);]
+              [
+                (8, unreachable_gen con t_opt size);
+                (1, nop_gen con t_opt size);
+                (*(1, drop_gen con t_opt size);*)
+                (8, select_gen con t_opt size);
+                (1, block_gen con t_opt size);
+                (1, loop_gen con t_opt size);
+                (4, if_gen con t_opt size);
+                (6, br_gen con t_opt size);
+                (6, brif_gen con t_opt size);
+                (6, brtable_gen con t_opt size);
+                (6, return_gen con t_opt size);
+                (8, call_gen con t_opt size);
+                (10, callindirect_gen con t_opt size);
+                (1, localGet_gen con t_opt size);
+                (*(1, localSet_gen con t_opt size);*)
+                (8, localTee_gen con t_opt size);
+                (1, globalGet_gen con t_opt size);
+                (*(1, globalSet_gen con t_opt size);*)
+                (*(1, load_gen con t_opt size);*)
+                (*(1, store_gen con t_opt size);*)
+                (10, memorysize_gen con t_opt size);
+                (10, memorygrow_gen con t_opt size);
+                (1, const_gen con t_opt size);
+                (* test_gen *)
+                (* compare_gen *)
+                (4, unop_gen con t_opt size);
+                (4, binop_gen con t_opt size);
+                (4, cvtop_gen con t_opt size);
+              ]
             | MemIndexType
             | TableIndex _ ->
               [(1, const_gen con t_opt size);]))
@@ -290,8 +304,8 @@ and floatOp_relop_gen =
     [ Ast.FloatOp.Eq; Ast.FloatOp.Ne; Ast.FloatOp.Lt; Ast.FloatOp.Gt; Ast.FloatOp.Le;
       Ast.FloatOp.Ge; ]
 
-(** relop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and relop_gen con t_opt size = match t_opt with
+(** compare_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
+and compare_gen con t_opt size = match t_opt with
   | Some I32Type ->
     Gen.(oneof [
         (intOp_relop_gen >>= fun op ->
