@@ -48,7 +48,7 @@ let rec instrs_rule context output_ts size =
           | None        -> return None
           | Some instrs -> return (Some (instr'::instrs)))) in
   match output_ts with
-    []          ->
+  | [] ->
     let empty_gen = recgen context None [] in
     Gen.(oneof [ empty_gen; return (Some []) ])
   | t1::trst  ->
@@ -132,28 +132,15 @@ and instr_rule con t_opt size =
   in generate_rule rules
 
 and generate_rule rules =
-  let rec remove ctw gw xs = match xs with
-    | [] -> []
-    | ((w,_) as e)::rst ->
-      let tw = ctw + w in
-      if tw >= gw
-      then rst
-      else e::(remove tw gw rst) in
-  let rec verify ctw gw xs = match xs with
-    | [] -> Gen.return None
-    | (w,g)::rst ->
-      let tw = ctw + w in
-      (match tw >= gw with
-       | true  -> Gen.(g >>= fun t -> match t with
-         | Some _ -> return t
-         | None   ->
-           ( (* Sys.command ("echo 1 >> stat/backtrack" ); *)
-             generate_rule (remove 0 gw rules)))
-       | false -> verify tw gw rst) in
-  let tw = List.fold_left (fun t (w, _g) -> t + w) 0 rules in
-  match tw with
-  | 0 -> Gen.return None
-  | _ -> Gen.( int_range 1 tw >>= fun gw -> verify 0 gw rules)
+  let open Gen in
+  let rec try_in_order gs = match gs with
+    | [] -> return None
+    | g::gs' ->
+      g >>= fun t -> match t with
+      | None -> try_in_order gs'
+      | Some _ -> return t in
+  weighted_shuffle rules >>= try_in_order
+
 
 (**** Numeric Instructions ****)
 (*** Const ***)

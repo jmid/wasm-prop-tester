@@ -141,3 +141,29 @@ let get_ftype con funci =
         if ftype <> None
         then ftype 
         else find_findex con.funcs.f_f64 (Some F64Type)
+
+let rec instrs_length il = match il with
+  | []      -> 0
+  | (e : Ast.instr)::rst  -> match e.it with
+    | Ast.Block (t, l)   -> (instrs_length rst) + (instrs_length l) + 1
+    | Ast.Loop (t, l)    -> (instrs_length rst) + (instrs_length l) + 1
+    | Ast.If (t, l1, l2) -> (instrs_length rst) + (instrs_length l1) + (instrs_length l2) + 1
+    | _                  -> (instrs_length rst) + 1
+
+
+let gen_float rs = Random.State.float rs 1.0
+
+(* Implements a weighted random shuffle according to
+   http://utopia.duth.gr/~pefraimi/research/data/2007EncOfAlg.pdf
+   https://softwareengineering.stackexchange.com/questions/233541/how-to-implement-a-weighted-shuffle/344274#344274
+ *)
+let weighted_shuffle gs =
+  let open Gen in
+  let rec walk gs = match gs with
+    | [] -> return []
+    | (w,g)::gs' ->
+      gen_float >>= fun u ->
+      let w' = u ** (1. /. float_of_int w) in
+      walk gs' >>= fun gs'' -> return ((w',g)::gs'') in
+  walk gs >>= fun gs' ->
+  return (List.map snd (List.sort compare gs'))
