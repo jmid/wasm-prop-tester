@@ -53,11 +53,14 @@ let context =
     elems   = None;
     funcindex = 0; }
 
+let max_number_args = 10
+let max_number_funs = 15
+
 (** value_type_opt_gen : value_type option **)
 let value_type_opt_gen =
   Gen.(frequency
          [ 1, return None;
-           3, (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] >>= fun t -> return (Some t))
+           3, map (fun t -> Some t) (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type])
          ])
 
 (** stack_type_gen : int -> value_type list **)
@@ -66,10 +69,10 @@ let stack_type_gen n =
 
 (** func_type_gen : func_type **)
 let func_type_gen =
-  Gen.(int_bound 10 >>= fun n -> pair (stack_type_gen n) (value_type_opt_gen))
+  Gen.(int_bound max_number_args >>= fun n -> pair (stack_type_gen n) (value_type_opt_gen))
 
 (** func_type_list_gen : func_type list **)
-let func_type_list_gen = Gen.(list_size (int_bound 10) func_type_gen)
+let func_type_list_gen = Gen.(list_size (int_bound max_number_funs) func_type_gen)
 
 let process_funcs con flist index = 
   let rec process_flist funcs i = function
@@ -499,63 +502,6 @@ let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
 
 let arb_module = make ~print:module_printer ~shrink:module_shrink module_gen
 
-let stat_dir_name = "stat"
-
-let timestamp = string_of_float (Unix.time())
-
-let stat_dir = match Sys.file_exists stat_dir_name with
-  | true  -> ()
-  | false -> Unix.mkdir stat_dir_name 0o775
-
-let stat_file_name = stat_dir_name ^ "/" ^ timestamp ^ "stat." ^ "csv"
-
-let funcs_number (m: Ast.module_) = List.length m.it.funcs
-
-let call_func_length (m: Ast.module_) = 
-  let f = List.nth m.it.funcs 1 in
-  instrs_length f.it.body
-
-let funcs_length (m: Ast.module_) = 
-  List.fold_left (fun s (f: Ast.func) -> s + instrs_length f.it.body) 0 m.it.funcs
-
-let all_func_length (m: Ast.module_) = 
-  List.fold_left (fun s (f: Ast.func) -> s + (List.length f.it.body)) 0 m.it.funcs    
-
-let elems_length (m: Ast.module_) = List.length m.it.elems
-
-let globals_length (m: Ast.module_) = List.length m.it.globals
-
-let data_length (m: Ast.module_) = List.length m.it.data
-
-let rec call_number il = match il with
-  | [] -> 0
-  | (e: Ast.instr)::rst -> match e.it with
-    | Ast.Block (_,l) -> call_number rst + call_number l
-    | Ast.Loop (_,l)  -> call_number rst + call_number l
-    | Ast.If (_,l,l') -> call_number rst + call_number l + call_number l'
-    | Ast.Call _ -> 1 + call_number rst
-    | _          -> call_number rst
-
-let calls_number (m: Ast.module_) = 
-  List.fold_left (fun s (f: Ast.func) -> s + call_number f.it.body) 0 m.it.funcs
-
-let rec callIndirect_number il = match il with
-  | [] -> 0
-  | (e: Ast.instr)::rst -> match e.it with
-    | Ast.Block (_,l) -> callIndirect_number rst + callIndirect_number l
-    | Ast.Loop (_,l)  -> callIndirect_number rst + callIndirect_number l
-    | Ast.If (_,l,l') -> callIndirect_number rst + callIndirect_number l + callIndirect_number l'
-    | Ast.CallIndirect _ -> 1 + callIndirect_number rst
-    | _                  -> callIndirect_number rst
-
-let callIndirects_number (m: Ast.module_) = 
-  List.fold_left (fun s (f: Ast.func) -> s + callIndirect_number f.it.body) 0 m.it.funcs
-
-let stat_to_file m = 
-  let oc = open_out_gen [Open_append; Open_creat] 0o666 stat_file_name in
-    Printf.fprintf oc "%d;%d;%d;%d;%d;%d;%d;%d\n" (funcs_number m) (call_func_length m) (funcs_length m) (elems_length m) (globals_length m) (data_length m) (calls_number m) (callIndirects_number m);
-    close_out oc
-
 let run_test =
   let host_debug vs = match vs with
     | [v] -> Printf.printf "%s\n" (Values.string_of_value v); []
@@ -579,14 +525,6 @@ let run_test =
          | _ -> false *)
   )
 
-let implementations_stat_test =
-  Test.make ~name:"Stats" ~count:1000
-  arb_module
-  (function m ->
-    stat_to_file m;
-    module_to_wat m wat_file_name;
-    Sys.command ("../script/compare_engines.sh " ^ wat_file_name ^ " " ^ timestamp) = 0)
-
 let conversion_test =
   Test.make ~name:"Conversion" ~count:1000
   arb_module
@@ -594,7 +532,6 @@ let conversion_test =
     module_to_wat m wat_file_name;
     module_to_wasm m wasm_file_name;
     Sys.command ("../script/compare_refint.sh " ^ wat_file_name ^ " " ^ wasm_file_name) = 0)
-;;
 
 let wabt_test =
   Test.make ~name:"wabt" ~count:1000

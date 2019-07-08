@@ -1,8 +1,11 @@
 main:
-	ocamlbuild -package qcheck,wasm,bigarray src/main.native
+	ocamlbuild -package qcheck,wasm src/main.native
+
+stats:
+	ocamlbuild -package qcheck,wasm src/stats.native
 
 validate:
-	ocamlbuild -package qcheck,wasm,bigarray src/validate.native
+	ocamlbuild -package qcheck,wasm src/validate.native
 
 all:
 	ocamlbuild -package qcheck,wasm,bigarray -no-hygiene src/generator.cma
