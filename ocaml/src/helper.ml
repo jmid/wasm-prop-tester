@@ -163,7 +163,7 @@ let weighted_shuffle gs =
     | [] -> return []
     | (w,g)::gs' ->
       gen_float >>= fun u ->
-      let w' = u ** (1. /. float_of_int w) in
+      let w' = -. (u ** (1. /. float_of_int w)) in
       walk gs' >>= fun gs'' -> return ((w',g)::gs'') in
   walk gs >>= fun gs' ->
   return (List.map snd (List.sort compare gs'))
