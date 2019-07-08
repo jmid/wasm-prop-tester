@@ -24,7 +24,7 @@ let module_to_wat m file =
     close_out oc
 
 let module_to_wasm m file = 
-  let s = Encode.encode (m) in
+  let s = Encode.encode m in
   let oc = open_out_bin file in
   try
     output_string oc s;
@@ -342,6 +342,12 @@ let i64_shrink i =
 (*  let c = (I64.div_s i (I64.of_int_s 2)) in
     if c = i then Iter.empty else Iter.return c *)
 
+let f32_shrink i =
+  if i = F32.zero then Iter.empty else Iter.return F32.zero
+
+let f64_shrink i =
+  if i = F64.zero then Iter.empty else Iter.return F64.zero
+
 let rec instr_list_shrink is = match is with
   | [] -> Iter.empty
   | i::is ->
@@ -349,19 +355,32 @@ let rec instr_list_shrink is = match is with
       (match is with
        | [] -> Iter.empty
        | j::is -> (match i.Source.it,j.Source.it with
+           | Ast.Const _    , Ast.BrIf _
+           | Ast.LocalGet _ , Ast.BrIf _
+           | Ast.GlobalGet _, Ast.BrIf _
+           | Ast.Const _    , Ast.Drop
+           | Ast.LocalGet _ , Ast.Drop
+           | Ast.GlobalGet _, Ast.Drop
            | Ast.Const _, Ast.LocalSet _
            | Ast.Const _, Ast.GlobalSet _
            | Ast.GlobalGet _, Ast.GlobalSet _
            | Ast.LocalGet _ , Ast.LocalSet _
            | Ast.GlobalGet _, Ast.LocalSet _
-           | Ast.LocalGet _ , Ast.GlobalSet _ -> Iter.return is
-           | _, _ -> Iter.empty))
+           | Ast.LocalGet _ , Ast.GlobalSet _ -> return is
+           | Ast.Const _    , Ast.If (_,is1,is2)
+           | Ast.LocalGet _ , Ast.If (_,is1,is2)
+           | Ast.GlobalGet _, Ast.If (_,is1,is2) -> of_list [is1@is; is2@is]
+           | _, _ -> empty))
       <+>
       (match i.Source.it with
        | Ast.Nop
-       | Ast.LocalTee _ -> return is
+       | Ast.LocalTee _ -> return is         (* no change in stack -> omit *)
+       | Ast.Return ->
+         if is=[] then empty else return [i] (* delete instrs after return *)
+       | Ast.Block (sts,[])  -> return is    (* remove empty block *)
        | Ast.Block (sts,is') ->
          map (fun is'' -> as_phrase (Ast.Block (sts,is''))::is) (instr_list_shrink is')
+       | Ast.Loop (sts,[])  -> return is     (* remove empty loop *)
        | Ast.Loop (sts,is') ->
          map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink is')
        | Ast.If (sts,is1,is2) ->
@@ -375,8 +394,12 @@ let rec instr_list_shrink is = match is with
              map (fun j -> as_phrase (Ast.Const (as_phrase (Values.I32 j)))::is) (i32_shrink i)
            | Values.I64 i ->
              map (fun j -> as_phrase (Ast.Const (as_phrase (Values.I64 j)))::is) (i64_shrink i)
-           | Values.F32 f -> Iter.empty
-           | Values.F64 f -> Iter.empty)
+           | Values.F32 f ->
+             map (fun g -> as_phrase (Ast.Const (as_phrase (Values.F32 g)))::is) (f32_shrink f)
+           | Values.F64 f ->
+             map (fun g -> as_phrase (Ast.Const (as_phrase (Values.F64 g)))::is) (f64_shrink f)
+
+         )
        | _ -> empty)
       <+>
       map (fun is' -> i::is') (instr_list_shrink is)
@@ -417,15 +440,46 @@ let split n xs =
 let rec shrink_list_elements ~shrink xs = match xs with
   | [] -> Iter.empty
   | x::xs ->
-    Iter.(map (fun x' -> x'::xs) (shrink x)
-          <+>
-          map (fun xs -> x::xs) (shrink_list_elements ~shrink xs))
+    Iter.(
+      map (fun x' -> x'::xs) (shrink x)
+      <+>
+      map (fun xs -> x::xs) (shrink_list_elements ~shrink xs))
+
+let rec shrink_functions (fs : Ast.func list) (types : Wasm.Ast.type_ list) = match fs with
+  | [] -> Iter.empty
+  | f::fs ->
+    Iter.(
+      map
+        (fun f' -> f'::fs)
+        (match f.it.Ast.body with
+         | []  -> empty (* don't shrink empty body *)
+         | [i] -> empty (* or one instr body *)
+         | _  ->
+           let var = f.it.ftype.it in
+           let typ = List.nth types (Int32.to_int var) in
+           match typ.Source.it with
+           | Types.FuncType ([],[]) ->
+             return (as_phrase { f.it with Ast.body = [] })
+           | Types.FuncType (_,[rt]) ->
+             let last = Ast.Const (as_phrase (match rt with
+                 | I32Type -> Values.I32 I32.zero
+                 | I64Type -> Values.I64 I64.zero
+                 | F32Type -> Values.F32 F32.zero
+                 | F64Type -> Values.F64 F64.zero)) in
+             return (as_phrase { f.it with Ast.body = [as_phrase last] })
+           | _ -> empty)
+      <+>
+      map (fun fs' -> f::fs') (shrink_functions fs types))
 
 let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
   let module_valid m = try Valid.check_module m; true with Valid.Invalid (_,_) -> false in
   Shrink.filter module_valid
     (fun (m : Wasm.Ast.module_' Wasm.Source.phrase) ->
        Iter.(
+         map
+           (fun funs' -> as_phrase { m.it with Ast.funcs = funs' })
+           (shrink_functions m.it.Ast.funcs m.it.Ast.types)
+         <+>
          let fixed,rest = split 7 m.it.Ast.funcs in (* 3 imports, start, 3 exports *)
          map
            (fun fixed' -> as_phrase { m.it with Ast.funcs = fixed'@rest })
@@ -445,33 +499,24 @@ let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
 
 let arb_module = make ~print:module_printer ~shrink:module_shrink module_gen
 
-let stat_dir_name = "stat";;
+let stat_dir_name = "stat"
 
 let timestamp = string_of_float (Unix.time())
 
 let stat_dir = match Sys.file_exists stat_dir_name with
   | true  -> ()
-  | false -> Unix.mkdir stat_dir_name 0o775;;
+  | false -> Unix.mkdir stat_dir_name 0o775
 
-let stat_file_name = stat_dir_name ^ "/" ^ timestamp ^ "stat." ^ "csv";;
+let stat_file_name = stat_dir_name ^ "/" ^ timestamp ^ "stat." ^ "csv"
 
-let funcs_number (m: Ast.module_) = List.length m.it.funcs;;
-
-let rec instrs_length il s = match il with
-    | (e: Ast.instr)::rst  -> (match e.it with
-        | Ast.Block (t, l)   -> (instrs_length rst (s)) + (instrs_length l (s))
-        | Ast.Loop (t, l)    -> (instrs_length rst (s)) + (instrs_length l (s))
-        | Ast.If (t, l1, l2) -> (instrs_length rst (s)) + (instrs_length l1 (s)) + (instrs_length l2 (s))
-        | _                  -> (instrs_length rst (s)) + 1
-      )
-    | []      -> s
+let funcs_number (m: Ast.module_) = List.length m.it.funcs
 
 let call_func_length (m: Ast.module_) = 
   let f = List.nth m.it.funcs 1 in
-  instrs_length f.it.body 0
+  instrs_length f.it.body
 
-let funcs_lenght (m: Ast.module_) = 
-  List.fold_left (fun s (f: Ast.func) -> s + (instrs_length f.it.body 0)) 0 m.it.funcs
+let funcs_length (m: Ast.module_) = 
+  List.fold_left (fun s (f: Ast.func) -> s + instrs_length f.it.body) 0 m.it.funcs
 
 let all_func_length (m: Ast.module_) = 
   List.fold_left (fun s (f: Ast.func) -> s + (List.length f.it.body)) 0 m.it.funcs    
@@ -482,52 +527,34 @@ let globals_length (m: Ast.module_) = List.length m.it.globals
 
 let data_length (m: Ast.module_) = List.length m.it.data
 
-let rec call_number il s = match il with
-  | (e: Ast.instr)::rst  -> (match e.it with
-      | Ast.Call _   -> (call_number rst (s)) + 1
-      | _            -> (call_number rst (s))
-    )
-  | []      -> s
+let rec call_number il = match il with
+  | [] -> 0
+  | (e: Ast.instr)::rst -> match e.it with
+    | Ast.Block (_,l) -> call_number rst + call_number l
+    | Ast.Loop (_,l)  -> call_number rst + call_number l
+    | Ast.If (_,l,l') -> call_number rst + call_number l + call_number l'
+    | Ast.Call _ -> 1 + call_number rst
+    | _          -> call_number rst
 
 let calls_number (m: Ast.module_) = 
-  List.fold_left (fun s (f: Ast.func) -> s + (call_number f.it.body 0)) 0 m.it.funcs
+  List.fold_left (fun s (f: Ast.func) -> s + call_number f.it.body) 0 m.it.funcs
 
-let rec callIndirect_number il s = match il with
-  | (e: Ast.instr)::rst  -> (match e.it with
-      | Ast.CallIndirect _   -> (callIndirect_number rst (s)) + 1
-      | _                    -> (callIndirect_number rst (s))
-    )
-  | []      -> s
+let rec callIndirect_number il = match il with
+  | [] -> 0
+  | (e: Ast.instr)::rst -> match e.it with
+    | Ast.Block (_,l) -> callIndirect_number rst + callIndirect_number l
+    | Ast.Loop (_,l)  -> callIndirect_number rst + callIndirect_number l
+    | Ast.If (_,l,l') -> callIndirect_number rst + callIndirect_number l + callIndirect_number l'
+    | Ast.CallIndirect _ -> 1 + callIndirect_number rst
+    | _                  -> callIndirect_number rst
 
 let callIndirects_number (m: Ast.module_) = 
-  List.fold_left (fun s (f: Ast.func) -> s + (callIndirect_number f.it.body 0)) 0 m.it.funcs
-    
-  
+  List.fold_left (fun s (f: Ast.func) -> s + callIndirect_number f.it.body) 0 m.it.funcs
 
 let stat_to_file m = 
   let oc = open_out_gen [Open_append; Open_creat] 0o666 stat_file_name in
-    Printf.fprintf oc "%d;%d;%d;%d;%d;%d;%d;%d\n" (funcs_number m) (call_func_length m) (funcs_lenght m) (elems_length m) (globals_length m) (data_length m) (calls_number m) (callIndirects_number m);
-    close_out oc;;
-
-let implementations_test =
-  Test.make ~name:"Implementations" ~count:100 (*10000*)
-  arb_module
-  (function m ->
-    module_to_wat m wat_file_name;
-    Sys.command ("../script/compare_engines.sh " ^ wat_file_name) = 0
-  )
-;;
-
-let output_validates_test =
-  Test.make ~name:"output validates" ~count:1000
-  arb_module
-  (function m ->
-     (* try *)
-       Valid.check_module m;
-       true
-     (*with (Valid.Invalid (r,str)) -> false *)
-  )
-;;
+    Printf.fprintf oc "%d;%d;%d;%d;%d;%d;%d;%d\n" (funcs_number m) (call_func_length m) (funcs_length m) (elems_length m) (globals_length m) (data_length m) (calls_number m) (callIndirects_number m);
+    close_out oc
 
 let run_test =
   let host_debug vs = match vs with
@@ -558,9 +585,7 @@ let implementations_stat_test =
   (function m ->
     stat_to_file m;
     module_to_wat m wat_file_name;
-    Sys.command ("../script/compare_engines.sh " ^ wat_file_name ^ " " ^ timestamp) = 0
-  )
-;;
+    Sys.command ("../script/compare_engines.sh " ^ wat_file_name ^ " " ^ timestamp) = 0)
 
 let conversion_test =
   Test.make ~name:"Conversion" ~count:1000
@@ -568,8 +593,7 @@ let conversion_test =
   (function m ->
     module_to_wat m wat_file_name;
     module_to_wasm m wasm_file_name;
-    Sys.command ("../script/compare_refint.sh " ^ wat_file_name ^ " " ^ wasm_file_name) = 0
-  )
+    Sys.command ("../script/compare_refint.sh " ^ wat_file_name ^ " " ^ wasm_file_name) = 0)
 ;;
 
 let wabt_test =
@@ -578,246 +602,62 @@ let wabt_test =
   (function m ->
     module_to_wat m wat_file_name;
     module_to_wasm m wasm_file_name;
-    Sys.command ("../script/compare_wabt.sh " ^ wat_file_name ^ " " ^ wasm_file_name) = 0
-  )
-;;
+    Sys.command ("../script/compare_wabt.sh " ^ wat_file_name ^ " " ^ wasm_file_name) = 0)
 
-let float_test = 
+let float_test =
   Test.make ~name:"Round" ~count:1000
   float
   (function f ->
-    let m = (as_phrase
+    let m = as_phrase
       { Ast.empty_module with
-        Ast.types = (func_type_list_to_type_phrase ([([], Some (F32Type))]));
-        Ast.funcs = [as_phrase (get_func [] (as_phrase 0l) [(as_phrase (Ast.Const (as_phrase (Values.F32 (F32.of_float 1.62315690127)))))])]
-      }
-    ) in
+        Ast.types = func_type_list_to_type_phrase ([([], Some (F32Type))]);
+        Ast.funcs = [as_phrase (get_func [] (as_phrase 0l)
+                                  [as_phrase (Ast.Const (as_phrase (Values.F32 (F32.of_float 1.62315690127))))])]} in
     module_to_wat m wat_file_name;
-    Sys.command ("../script/compare_engines.sh " ^ wat_file_name ) = 0
-  )
-;;
+    Sys.command ("../script/compare_engines.sh " ^ wat_file_name) = 0)
 
 let buffer_test = 
   Test.make ~name:"Buffer" ~count:1000
   (make (Gen.return 2) 
     ~print:Print.int
-    ~shrink:(fun i -> (Iter.of_list [i * 100; i * 10; i * 2; i + 100; i + 50; i + 20; i + 5; i + 1;]))
-  )
+    ~shrink:(fun i -> Iter.of_list [i * 100; i * 10; i * 2; i + 100; i + 50; i + 20; i + 5; i + 1;]))
   (function i ->
     let m = as_phrase
       { Ast.empty_module with
-      Ast.types = (func_type_list_to_type_phrase ([([I32Type], None);([I32Type], None);([], Some (I32Type))]));
-      Ast.funcs = [as_phrase (get_func [] (as_phrase 1l) [
-        (as_phrase (Ast.LocalGet (as_phrase 0l)));
-        (as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i)))));
-        (as_phrase (Ast.Compare (Values.I32 (Ast.IntOp.Eq))));
-        (as_phrase (Ast.If ([], (
-          [
-            (as_phrase Ast.Return)
-          ]
-          ), (
-          [
-            (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
-            (as_phrase (Ast.Call (as_phrase 0l)));
-            (as_phrase (Ast.LocalGet (as_phrase 0l)));
-            (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
-            (as_phrase (Ast.Binary (Values.I32 (Ast.IntOp.Add))));
-            (as_phrase (Ast.Call (as_phrase 1l)));
-          ]
-          ))));
-        ]);
-      as_phrase (get_func [] (as_phrase 2l) [
-        (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
-        (as_phrase (Ast.Call (as_phrase 1l)));
-        (as_phrase (Ast.Loop ([Types.I32Type], [
-          (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
-          (as_phrase (Ast.Br (as_phrase 0l)))
-        ])))
-        ]);
-      ];
-      Ast.start = None;
-      Ast.elems = [];
-      Ast.data = [];
-      Ast.imports = [
-        as_phrase({
-          Ast.module_name = string_to_name "imports";
-          Ast.item_name = string_to_name "log";
-          Ast.idesc = as_phrase (Ast.FuncImport (as_phrase 0l))
-        });
-      ];
-      Ast.exports = [
-        as_phrase ({
-          Ast.name = string_to_name "runi32";
-          Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 2l));
-        });
-      ];
-    } in
+        Ast.types = func_type_list_to_type_phrase [([I32Type], None); ([I32Type], None); ([], Some I32Type)];
+        Ast.funcs =
+          [as_phrase (get_func [] (as_phrase 1l) [
+               as_phrase (Ast.LocalGet (as_phrase 0l));
+               as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i))));
+               as_phrase (Ast.Compare (Values.I32 (Ast.IntOp.Eq)));
+               as_phrase (Ast.If ([],
+                                  [as_phrase Ast.Return],
+                                  [as_phrase (Ast.Const (as_phrase (Values.I32 1l)));
+                                   as_phrase (Ast.Call (as_phrase 0l));
+                                   as_phrase (Ast.LocalGet (as_phrase 0l));
+                                   as_phrase (Ast.Const (as_phrase (Values.I32 1l)));
+                                   as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add));
+                                   as_phrase (Ast.Call (as_phrase 1l)) ]))]);
+           as_phrase (get_func [] (as_phrase 2l) [
+               as_phrase (Ast.Const (as_phrase (Values.I32 1l)));
+               as_phrase (Ast.Call (as_phrase 1l));
+               as_phrase (Ast.Loop ([Types.I32Type], [
+                    (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
+                    (as_phrase (Ast.Br (as_phrase 0l)))
+                  ]))])];
+        Ast.start = None;
+        Ast.elems = [];
+        Ast.data = [];
+        Ast.imports = [
+          as_phrase { Ast.module_name = string_to_name "imports";
+                      Ast.item_name = string_to_name "log";
+                      Ast.idesc = as_phrase (Ast.FuncImport (as_phrase 0l)) }];
+        Ast.exports = [
+          as_phrase { Ast.name = string_to_name "runi32";
+                      Ast.edesc = as_phrase (Ast.FuncExport (as_phrase 2l)) }] } in
     module_to_wat m wat_file_name;
-    Sys.command ("../script/compare_buffer.sh " ^ wat_file_name ) = 0
-  )
-;;
+    Sys.command ("../script/compare_buffer.sh " ^ wat_file_name ) = 0)
 
 let stack_test = 
-  Test.make ~name:"Stack" ~count:1000
-  int
-  (function i ->
-    Sys.command ("../script/compare_stack.sh ") = 0
-  )
-;;
-
-(* QCheck_runner.set_seed(314195386);; *)
-
-(* QCheck_runner.set_seed(516953645);; *)
-
-(* QCheck_runner.set_seed(68061653);; *)
-
-(* QCheck_runner.set_seed(36371916);; *)
-
-(* QCheck_runner.set_seed(149512434);; *)
-
-(* QCheck_runner.set_seed(498103647);; *)
-
-(* QCheck_runner.set_seed(421117913);; *)
-(* QCheck_runner.set_seed(31444403);; *)
-(* QCheck_runner.set_seed(3606552);; *)
-(* QCheck_runner.set_seed(243782223);; *)
-(* QCheck_runner.set_seed(265188083);; *)
-(* QCheck_runner.set_seed(196716697);; *)
-(* QCheck_runner.set_seed(182324116);; *)
-(* QCheck_runner.set_seed(15600868);; *)
-(* QCheck_runner.set_seed(457392187);; *)
-(* QCheck_runner.set_seed(416362809);; *)
-(* QCheck_runner.set_seed(393719003);; *)
-(* QCheck_runner.set_seed(294956219);; *)
-(*QCheck_runner.run_tests ~verbose:true*)
-QCheck_runner.run_tests_main
-  [
-    (*output_validates_test;*)
-    implementations_test;
-    (* run_test; *)
-    (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
-
-(*
-~stats:[("Length", length_stat); ("Nones", none_stat); ("Nops", nop_stat); ("Drops", drop_stat)]
-
-let arithmetic_spec_ast =
-  Test.make ~name:"Arithmetic expressions" ~count:1
-  arb_module
-  (function
-    | None    -> true
-    | Some e  ->
-      let empty = get_module types_ [as_phrase (get_func e)] in
-        let empty_module = as_phrase (empty) in
-          let arrange_m = Arrange.module_ empty_module in
-            wasm_to_file arrange_m
-      ;
-      Sys.command ("../script/compare.sh " ^ file_name) = 0
-  )
-;;
-294956219
-QCheck_runner.set_seed(410086340);;
-22165827
-(*QCheck_runner.set_seed(401353417);;*)
-QCheck_runner.run_tests ~verbose:true [ (*arithmetic_spec_ast;*) (*module_test;*)module_test; ] ;;
-*)
-(*
-
-QCheck_runner.run_tests ~verbose:true [ arithmetic_ast; arithmetic_spec_ast; ] ;;
-*)
-(*
-
-let f = F32.of_float (-1.0)
-let s = F32.sqrt f
-
-;;
-
-print_endline (F32.to_string s)
-
-*)
-
-(* let l = {
-          Types.min = Int32.of_int 10000;
-          Types.max = None;
-        };;
-let table = {
-      Ast.ttype = Types.TableType (l, Types.AnyFuncType)
-    };;
-let tables = [Helper.as_phrase table];;
-
-let get_empty_module elems = 
-  {
-    Ast.types = [
-      as_phrase (Types.FuncType ([], []));
-      as_phrase (Types.FuncType ([], []));
-      as_phrase (Types.FuncType ([], []));
-      as_phrase (Types.FuncType ([], []));
-      as_phrase (Types.FuncType ([], []));
-    ];
-    Ast.globals = [];
-    Ast.tables = tables;
-    Ast.memories = [];
-    Ast.funcs = [
-      as_phrase (get_func [] (as_phrase (Int32.of_int 0)) []);
-      as_phrase (get_func [] (as_phrase (Int32.of_int 1)) []);
-      as_phrase (get_func [] (as_phrase (Int32.of_int 2)) []);
-      as_phrase (get_func [] (as_phrase (Int32.of_int 3)) []);
-      as_phrase (get_func [] (as_phrase (Int32.of_int 4)) []);
-    ];
-    Ast.start = None;
-    Ast.elems  = elems;
-    Ast.data = [];
-    Ast.imports = [];
-    Ast.exports = [];
-  }
-;;
-
-let c = Gen.return 10000;;
-
-let rec gener i m =
-  Sys.command ("echo "^ string_of_int i);
-  if (i * 10) >= m then
-  true
-  else (
-    let es = Gen.generate1 (
-      elem_segment_list_gen 5 (Some ({
-        Types.min = Int32.of_int (i * 10);
-        Types.max = None;
-      }))) in
-      let mod_ = (as_phrase (get_empty_module (elems_to_ast_elems es))) in
-      stat_to_file mod_;
-      let arrange_m = Arrange.module_ mod_ in
-        wasm_to_file arrange_m
-      ;
-      Sys.command ("../script/compare.sh " ^ file_name ^ " " ^ timestamp);
-  (* (Gen.(
-    elem_segment_list_gen 5 (Some ({
-      Types.min = Int32.of_int m;
-      Types.max = None;
-    })) ==> fun es ->
-    let mod_ = get_empty_module (elems_to_ast_elems es) in
-    stat_to_file mod_;
-    let arrange_m = Arrange.module_ mod_ in
-      wasm_to_file arrange_m
-    ;
-    Sys.command ("../script/compare.sh " ^ file_name ^ " " ^ timestamp)
-  )); *)
-    gener (i + 1) m);;
-
-let arb_elems = make (elem_segment_list_gen 5 (Some (l)))
-
-let speed_test =
-  Test.make ~name:"Speed" ~count:1
-  (make c)
-  (function m ->
-    gener 0 m
-    (* Sys.command ("echo "^ string_of_int m); *)
-    (* Sys.command ("echo "^ string_of_int (List.length m)); *)
-    (* true *)
-    (* stat_to_file m;
-    let arrange_m = Arrange.module_ m in
-      wasm_to_file arrange_m
-    ;
-    Sys.command ("../script/compare.sh " ^ file_name ^ " " ^ timestamp) = 0 *)
-  )
-;;
-QCheck_runner.run_tests ~verbose:true [ speed_test; ] ;; *)
+  Test.make ~name:"Stack" ~count:1000 int
+    (function i -> Sys.command ("../script/compare_stack.sh ") = 0)
