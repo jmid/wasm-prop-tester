@@ -54,7 +54,7 @@ let context =
     funcindex = 0; }
 
 let max_number_args = 10
-let max_number_funs = 15
+let max_number_funs = 10
 
 (** value_type_opt_gen : value_type option **)
 let value_type_opt_gen =
@@ -413,11 +413,12 @@ and instr_shrink i = match i with
   | Ast.Loop (sts,is) -> Iter.map (fun is' -> Ast.Loop (sts,is')) (instr_list_shrink is)
   | _ -> Iter.empty
 *)
+(*
 let func_shrink f =
   Iter.map
     (fun body' -> as_phrase { f.Source.it with Ast.body = body'})
     (instr_list_shrink f.Source.it.Ast.body)
-
+*)
 let global_shrink gs g =
   let g' = g.Source.it in
   Iter.map
@@ -440,6 +441,7 @@ let split n xs =
   walk n [] xs
 
 (* a size-preserving list-shrinker *)
+(*
 let rec shrink_list_elements ~shrink xs = match xs with
   | [] -> Iter.empty
   | x::xs ->
@@ -447,6 +449,7 @@ let rec shrink_list_elements ~shrink xs = match xs with
       map (fun x' -> x'::xs) (shrink x)
       <+>
       map (fun xs -> x::xs) (shrink_list_elements ~shrink xs))
+*)
 
 let rec shrink_functions (fs : Ast.func list) (types : Wasm.Ast.type_ list) = match fs with
   | [] -> Iter.empty
@@ -458,19 +461,28 @@ let rec shrink_functions (fs : Ast.func list) (types : Wasm.Ast.type_ list) = ma
          | []  -> empty (* don't shrink empty body *)
          | [i] -> empty (* or one instr body *)
          | _  ->
-           let var = f.it.ftype.it in
-           let typ = List.nth types (Int32.to_int var) in
-           match typ.Source.it with
-           | Types.FuncType ([],[]) ->
-             return (as_phrase { f.it with Ast.body = [] })
-           | Types.FuncType (_,[rt]) ->
-             let last = Ast.Const (as_phrase (match rt with
-                 | I32Type -> Values.I32 I32.zero
-                 | I64Type -> Values.I64 I64.zero
-                 | F32Type -> Values.F32 F32.zero
-                 | F64Type -> Values.F64 F64.zero)) in
-             return (as_phrase { f.it with Ast.body = [as_phrase last] })
-           | _ -> empty)
+           (map
+             (fun body' -> as_phrase { f.it with Ast.body = body' })
+             ((let var = f.it.ftype.it in
+              let typ = List.nth types (Int32.to_int var) in
+              match typ.Source.it with
+              | Types.FuncType ([],[]) ->
+                return [] (*(as_phrase { f.it with Ast.body = [] })*)
+              | Types.FuncType (_,[rt]) ->
+                let last = match rt with
+                    | I32Type -> Values.I32 I32.zero
+                    | I64Type -> Values.I64 I64.zero
+                    | F32Type -> Values.F32 F32.zero
+                    | F64Type -> Values.F64 F64.zero in
+                return [as_phrase (Ast.Const (as_phrase last))]
+              | _ -> empty)
+              <+>
+              instr_list_shrink f.Source.it.Ast.body)
+           ))
+(*      <+>
+      map
+        (fun body' -> (as_phrase { f.Source.it with Ast.body = body'})::fs)
+        (instr_list_shrink f.Source.it.Ast.body) *)
       <+>
       map (fun fs' -> f::fs') (shrink_functions fs types))
 
@@ -484,15 +496,20 @@ let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
            (shrink_functions m.it.Ast.funcs m.it.Ast.types)
          <+>
          let fixed,rest = split 7 m.it.Ast.funcs in (* 3 imports, start, 3 exports *)
-         map
+(*       map
            (fun fixed' -> as_phrase { m.it with Ast.funcs = fixed'@rest })
            (shrink_list_elements ~shrink:func_shrink fixed)
-         <+>
+         <+> *)
          map
            (fun rest' -> as_phrase { m.it with Ast.funcs = fixed@rest' })
-           (Shrink.list ~shrink:func_shrink rest (*m.it.Ast.funcs*))
+           (Shrink.list (*~shrink:func_shrink*) rest (*m.it.Ast.funcs*))
          <+>
-         map (fun ds -> as_phrase { m.it with Ast.data = ds }) (Shrink.list m.it.Ast.data)
+         map (fun ds -> as_phrase { m.it with Ast.data = ds })
+           (Shrink.list
+              ~shrink:(fun s ->
+                  (Iter.map (fun s' -> as_phrase {s.Source.it with Ast.init = s'})
+                    (Shrink.string s.Source.it.Ast.init)))
+                    m.it.Ast.data)
          <+>
          map (fun gs -> as_phrase { m.it with Ast.globals = gs })
            (Shrink.list ~shrink:(global_shrink m.it.Ast.globals) m.it.Ast.globals)
