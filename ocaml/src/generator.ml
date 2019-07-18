@@ -351,6 +351,17 @@ let f32_shrink i =
 let f64_shrink i =
   if i = F64.zero then Iter.empty else Iter.return F64.zero
 
+let rec max_global il = match il with
+  | [] -> 0l
+  | (e: Ast.instr)::rst ->
+    match e.it with
+    | Ast.Block (_,l) -> max (max_global rst) (max_global l)
+    | Ast.Loop (_,l)  -> max (max_global rst) (max_global l)
+    | Ast.If (_,l,l') -> max (max_global rst) (max (max_global l) (max_global l'))
+    | Ast.GlobalGet v -> max v.it (max_global rst)
+    | Ast.GlobalSet v -> max v.it (max_global rst)
+    | _               -> max_global rst
+
 let rec instr_list_shrink is = match is with
   | [] -> Iter.empty
   | i::is ->
