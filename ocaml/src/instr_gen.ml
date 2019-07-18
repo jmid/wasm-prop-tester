@@ -67,8 +67,8 @@ and instr_rule con t_opt size =
         | _ ->
           [(1, nop_gen con t_opt size);
            (2, drop_gen con t_opt size);
-           (1, block_gen con t_opt size);
-           (1, loop_gen con t_opt size);
+           (2, block_gen con t_opt size);
+           (2, loop_gen con t_opt size);
            (1, call_gen con t_opt size);
            (1, localSet_gen con t_opt size);
            (1, globalSet_gen con t_opt size);
@@ -84,30 +84,31 @@ and instr_rule con t_opt size =
                (1, nop_gen con t_opt size);
                (*(1, drop_gen con t_opt size);*)
                (8, select_gen con t_opt size);
-               (1, block_gen con t_opt size);
-               (1, loop_gen con t_opt size);
-               (4, if_gen con t_opt size);
-               (6, br_gen con t_opt size);
-               (6, brif_gen con t_opt size);
-               (6, brtable_gen con t_opt size);
+               (2, block_gen con t_opt size);
+               (2, loop_gen con t_opt size);
+               (8, if_gen con t_opt size);
+               (10, br_gen con t_opt size);
+               (10, brif_gen con t_opt size);
+               (10, brtable_gen con t_opt size);
                (6, return_gen con t_opt size);
                (8, call_gen con t_opt size);
-               (10, callindirect_gen con t_opt size);
+               (14, callindirect_gen con t_opt size);
                (1, localGet_gen con t_opt size);
                (*(1, localSet_gen con t_opt size);*)
-               (8, localTee_gen con t_opt size);
+               (15, localTee_gen con t_opt size);
                (1, globalGet_gen con t_opt size);
                (*(1, globalSet_gen con t_opt size);*)
                (*(1, load_gen con t_opt size);*)
                (*(1, store_gen con t_opt size);*)
-               (10, memorysize_gen con t_opt size);
-               (10, memorygrow_gen con t_opt size);
+               (12, load_gen con t_opt size);
+               (20, memorysize_gen con t_opt size);
+               (20, memorygrow_gen con t_opt size);
                (1, const_gen con t_opt size);
-               (8, testop_gen con t_opt size);
-               (8, compare_gen con t_opt size);
-               (4, unop_gen con t_opt size);
-               (4, binop_gen con t_opt size);
-               (4, cvtop_gen con t_opt size);
+               (20, testop_gen con t_opt size);
+               (20, compare_gen con t_opt size);
+               (8, unop_gen con t_opt size);
+               (8, binop_gen con t_opt size);
+               (8, cvtop_gen con t_opt size);
               ]
             | I64Type | F32Type | F64Type ->
               [
@@ -115,30 +116,31 @@ and instr_rule con t_opt size =
                 (1, nop_gen con t_opt size);
                 (*(1, drop_gen con t_opt size);*)
                 (8, select_gen con t_opt size);
-                (1, block_gen con t_opt size);
-                (1, loop_gen con t_opt size);
-                (4, if_gen con t_opt size);
-                (6, br_gen con t_opt size);
-                (6, brif_gen con t_opt size);
-                (6, brtable_gen con t_opt size);
+                (2, block_gen con t_opt size);
+                (6, loop_gen con t_opt size);
+                (8, if_gen con t_opt size);
+                (10, br_gen con t_opt size);
+                (10, brif_gen con t_opt size);
+                (10, brtable_gen con t_opt size);
                 (6, return_gen con t_opt size);
                 (8, call_gen con t_opt size);
-                (10, callindirect_gen con t_opt size);
+                (14, callindirect_gen con t_opt size);
                 (1, localGet_gen con t_opt size);
                 (*(1, localSet_gen con t_opt size);*)
-                (8, localTee_gen con t_opt size);
+                (15, localTee_gen con t_opt size);
                 (1, globalGet_gen con t_opt size);
                 (*(1, globalSet_gen con t_opt size);*)
                 (*(1, load_gen con t_opt size);*)
                 (*(1, store_gen con t_opt size);*)
-                (10, memorysize_gen con t_opt size);
-                (10, memorygrow_gen con t_opt size);
+                (12, load_gen con t_opt size);
+                (20, memorysize_gen con t_opt size);
+                (20, memorygrow_gen con t_opt size);
                 (1, const_gen con t_opt size);
                 (* test_gen *)
                 (* compare_gen *)
-                (4, unop_gen con t_opt size);
-                (4, binop_gen con t_opt size);
-                (4, cvtop_gen con t_opt size);
+                (8, unop_gen con t_opt size);
+                (8, binop_gen con t_opt size);
+                (8, cvtop_gen con t_opt size);
               ]
             | MemIndexType
             | TableIndex _ ->
@@ -462,12 +464,12 @@ and load_gen con t_opt size = match con.mems with
       | None   -> Gen.return None
       | Some t ->
         Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
-             frequency [
-               1, return None;
-               3, pair
-                    (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32])
-                    (oneofl [ Memory.SX; Memory.ZX ]) >>= fun (p, sx) ->
-               return (Some (p, sx)) ] >>= fun p_opt ->
+            map 
+                (fun (p, sx) -> (Some (p, sx)))
+                (pair
+                  (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32])
+                  (oneofl [ Memory.SX; Memory.ZX ])) >>= 
+            fun p_opt ->
         pair (align_load_gen (to_wasm_value_type t) p_opt) ui32 >>= fun (align, offset) ->
           let mop = { Ast.ty     = to_wasm_value_type t;
                       Ast.align  = align;
