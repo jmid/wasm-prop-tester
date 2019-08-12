@@ -45,6 +45,8 @@ fi
 ERROR=$?
 if [ "$ERROR" != 0 ]
 then
+    echo "wat2wasm failed"
+    cp -f "$WAT_FILE"  "$TMP_DIR/prev.wat"
     exit "$ERROR"
 fi
 
@@ -67,6 +69,7 @@ fi
 ERROR=$?
 if [ "$ERROR" != 0 ]
 then
+    echo "conversion failed"
     exit "$ERROR"
 fi
 
@@ -91,19 +94,17 @@ then
         echo 0 >> "$STAT_BACKTRACK"
     fi
 else 
-
     timeout 10 ch "$JS_CH_FILE" > "$TMP_CH" 2>&1
     timeout 10 jsc "$JS_JSC_FILE" > "$TMP_JSC" 2>&1
     timeout 10 sm "$JS_SM_FILE" > "$TMP_SM" 2>&1
     timeout 10 v8 "$JS_V8_FILE" > "$TMP_V8" 2>&1
-
 fi
 
 cmp -n 5000 $TMP_CH $TMP_JSC > $TMP_CH_JSC 2>&1
 cmp -n 5000 $TMP_JSC $TMP_SM > $TMP_JSC_SM 2>&1
 cmp -n 5000 $TMP_SM $TMP_V8 > $TMP_SM_V8 2>&1
 
-if [ -s "$TMP_CH_JSC" ] || [ -s "$TMP_JSC_SM" ] || [ -s "$TMP_SM_V8" ]
+if [ -s "$TMP_CH_JSC" ] || [ -s "$TMP_JSC_SM" ] || [ -s "$TMP_SM_V8" ];
 then
   # Save diff result, to avoid last shrinking step overwriting it
   cp -f "$WAT_FILE"  "$TMP_DIR/prev.wat"
