@@ -11,7 +11,6 @@ let compare_engines_test =
 
 QCheck_runner.run_tests_main
   [
-    (*output_validates_test;*)
     compare_engines_test;
     (* run_test; *)
     (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
