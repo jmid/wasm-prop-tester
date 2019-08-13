@@ -167,3 +167,9 @@ let weighted_shuffle gs =
       walk gs' >>= fun gs'' -> return ((w',g)::gs'') in
   walk gs >>= fun gs' ->
   return (List.map snd (List.sort (fun (f,_) (f',_) -> compare f f') gs'))
+
+(* For positive powers of 2  :-\ *)
+let rec log2 n = match n with
+  | 0 -> 0
+  | 1 -> 0
+  | _ -> 1 + log2 (n lsr 1)

@@ -454,7 +454,7 @@ and align_load_gen t p_opt =
   let width = match p_opt with
     | Some (p,_) -> Memory.packed_size p
     | None       -> Types.size t in
-  Gen.(int_range 1 width)
+  Gen.int_bound (log2 (width / 8))
 
 (*** Load ***)
 (** load_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -463,28 +463,26 @@ and load_gen con t_opt size = match con.mems with
   | Some m -> (match t_opt with
       | None   -> Gen.return None
       | Some t ->
-        Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
-            map 
-                (fun (p, sx) -> (Some (p, sx)))
-                (pair
-                  (oneofl [Memory.Pack8; Memory.Pack16; Memory.Pack32])
-                  (oneofl [ Memory.SX; Memory.ZX ])) >>= 
-            fun p_opt ->
-        pair (align_load_gen (to_wasm_value_type t) p_opt) ui32 >>= fun (align, offset) ->
+        Gen.((match t with
+            | I32Type -> opt (pair (oneofl Memory.([Pack8;Pack16]))        (oneofl Memory.([SX;ZX])))
+            | I64Type -> opt (pair (oneofl Memory.([Pack8;Pack16;Pack32])) (oneofl Memory.([SX;ZX])))
+            | F32Type
+            | F64Type (* storage size only allowed for integer loads *)
+            | MemIndexType
+            | TableIndex _ -> return None) >>= fun p_opt ->
+          pair (align_load_gen (to_wasm_value_type t) p_opt) ui32 >>= fun (align, offset) ->
           let mop = { Ast.ty     = to_wasm_value_type t;
                       Ast.align  = align;
                       Ast.offset = offset;
                       Ast.sz     = p_opt } in
-          return (Some (con, as_phrase (Ast.Load mop), [t; I32Type;])))
-)
+          return (Some (con, as_phrase (Ast.Load mop), [(*MemIndexType*)I32Type]))))
 
 (** align_store_gen **)
 and align_store_gen t p_opt =
   let width = match p_opt with
     | Some p -> Memory.packed_size p
-    | None   -> Types.size t
-  in
-  Gen.(int_range 0 width >>= fun i -> return 0)
+    | None   -> Types.size t in
+  Gen.int_bound (log2 (width / 8))
 
 (*** Store ***)
 (** store_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -495,13 +493,17 @@ and store_gen con t_opt size = match con.mems with
     | None   ->
       if (Int32.to_int m.min) < 1
       then Gen.return None
-      else Gen.(oneofl [I32Type; I64Type; (*Helper.F32Type; Helper.F64Type;*)] >>= fun t ->
-                frequency [ 1, return None;
-                            3, (oneofl [Memory.Pack8; Memory.Pack16; (*Memory.Pack32;*)] >>= fun p -> return (Some p)) ] >>= fun p_opt ->
-          pair (align_store_gen (to_wasm_value_type t) p_opt) (ui32) >>= fun (align, offset) ->
+      else Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t -> (match t with
+          | I32Type -> opt (oneofl Memory.([Pack8;Pack16]))
+          | I64Type -> opt (oneofl Memory.([Pack8;Pack16;Pack32]))
+          | F32Type
+          | F64Type (* storage size only allowed for integer stores *)
+          | MemIndexType
+          | TableIndex _ -> return None) >>= fun p_opt ->
+          pair (align_store_gen (to_wasm_value_type t) p_opt) ui32 >>= fun (align, offset) ->
             let mop = { Ast.ty     = to_wasm_value_type t;
-                        Ast.align  = 0;
-                        Ast.offset = 0l;
+                        Ast.align  = align;
+                        Ast.offset = offset;
                         Ast.sz     = p_opt } in
             return (Some (con, as_phrase (Ast.Store mop), [t; MemIndexType;]))))
 
