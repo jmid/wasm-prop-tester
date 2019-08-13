@@ -9,12 +9,6 @@ if (process.argv.length !== 4) {
 const buf = fs.readFileSync(process.argv[2]);
 const b = new Uint8Array(buf);
 
-const error_int_zero_div = 'integer division by zero';
-const error_overflow = 'integer overflow';
-const error_unreachable = 'unreachable';
-const error_stack = 'stack';
-const error_data_segment = 'data segment';
-
 console.log(
 `function printfl (f) {
     let s = f.toString();
@@ -27,44 +21,51 @@ console.log(
 	print(s);
     }
 }
-let unrepresentable_re = /(unrepresentable)/i;
 `);
 
 switch(process.argv[3]) {
     case "ch":
       console.log(
-`let zero_div_re = /(Division by zero)/i;
-let overflow_re = /(overflow)/i;
-let unreachable_re = /(Unreachable Code)/i;
-let stack_re = /(Out of stack space)/i;
-let data_segment_re = /(Data segment is out of range)/i;
+`let unrepresentable_re = /(unrepresentable in)/;
+let zero_div_re = /(Division by zero)/;
+let overflow_re = /(Overflow)/;
+let unreachable_re = /(Unreachable Code)/;
+let stack_re = /(Out of stack space)/;
+let data_segment_re = /(Data segment is out of range)/;
+let mem_index_re = /(Memory index is out of range)/;
 `);
       break;
     case "jsc":
       console.log(
-`let zero_div_re = /(Division by zero)/i;
-let overflow_re = /(Out of bounds)/i;
-let unreachable_re = /(Unreachable code should not be executed)/i;
-let stack_re = /(Maximum call stack size exceeded)/i;
-let data_segment_re = /(segment writes outside of memory)/i;
+`let unrepresentable_re = /(unrepresentable in)/;
+let zero_div_re = /(Division by zero)/;
+let overflow_re = /Out of bounds Trunc operation/;
+let unreachable_re = /(Unreachable code should not be executed)/;
+let stack_re = /(Maximum call stack size exceeded)/;
+let data_segment_re = /(segment writes outside of memory)/;
+let mem_index_re = /(Out of bounds memory access)/;
 `);
       break;
     case "sm":
       console.log(
-`let zero_div_re = /(integer divide by zero)/i;
-let overflow_re = /(overflow)/i;
-let unreachable_re = /(unreachable executed)/i;
-let stack_re = /(too much recursion)/i;
-let data_segment_re = /(data segment does not fit in memory)/i;
+`let unrepresentable_re = /(unrepresentable in)/;
+let zero_div_re = /(integer divide by zero)/;
+let overflow_re = /(integer overflow)/;
+let unreachable_re = /(unreachable executed)/;
+let stack_re = /(too much recursion)/;
+let data_segment_re = /(data segment does not fit in memory)/;
+let mem_index_re = /(index out of bounds)/;
 `);
         break;
     case "v8":
       console.log(
-`let zero_div_re = /(by zero)/i;
-let overflow_re = /(float unrepresentable in integer range)/i;
-let unreachable_re = /(unreachable)/i;
-let stack_re = /(Maximum call stack size exceeded)/i;
-let data_segment_re = /(data segment is out of bounds)/i;
+`let unrepresentable_re = /(unrepresentable in)/;
+let zero_div_re = /(divide by zero)/;
+let overflow_re = /(float unrepresentable in integer range)/;
+let unreachable_re = /(unreachable)/;
+let stack_re = /(Maximum call stack size exceeded)/;
+let data_segment_re = /(data segment is out of bounds)/;
+let mem_index_re = /(memory access out of bounds)/;
 `);
         break;
   } 
@@ -79,12 +80,13 @@ try {
      printfl(m.exports.runf32());
      printfl(m.exports.runf64());
 } catch(e) {
-     if (zero_div_re.exec(e.message)) print('" + error_int_zero_div + "')
-     else if (unreachable_re.exec(e.message)) print('" + error_unreachable + "')
-     else if (stack_re.exec(e.message)) print('" + error_stack + "')
-     else if (overflow_re.exec(e.message)) print('" + error_overflow + "')
-     else if (unrepresentable_re.exec(e.message)) print('" + error_overflow + "')
-     else if (data_segment_re.exec(e.message)) print('" + error_data_segment + "')
+     if (zero_div_re.test(e.message))             print('integer division by zero')
+     else if (unreachable_re.test(e.message))     print('unreachable code')
+     else if (stack_re.test(e.message))           print('stack overflow')
+     else if (overflow_re.test(e.message))        print('overflow')
+     else if (unrepresentable_re.test(e.message)) print('unrepresentable')
+     else if (data_segment_re.test(e.message))    print('data segment')
+     else if (mem_index_re.test(e.message))       print('memory index out of bounds')
      else print(e)
 }
 `);
