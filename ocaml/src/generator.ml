@@ -422,7 +422,6 @@ let rec instr_list_shrink gs is = match is with
              map (fun g -> as_phrase (Ast.Const (as_phrase (Values.F32 g)))::is) (f32_shrink f)
            | Values.F64 f ->
              map (fun g -> as_phrase (Ast.Const (as_phrase (Values.F64 g)))::is) (f64_shrink f)
-
          )
        | _ -> empty)
       <+>
@@ -520,6 +519,8 @@ let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
          <+>
          map (fun gs -> as_phrase { m.it with Ast.globals = gs })
            (Shrink.list ~shrink:(global_shrink m.it.Ast.globals) m.it.Ast.globals)
+         <+>
+         map (fun ts -> as_phrase { m.it with Ast.types = ts }) (Shrink.list m.it.Ast.types)
          <+>
          map (fun es -> as_phrase { m.it with Ast.elems = es }) (Shrink.list m.it.Ast.elems)
      ))
