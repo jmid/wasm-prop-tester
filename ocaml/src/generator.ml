@@ -517,6 +517,10 @@ let module_shrink (*(m : Wasm.Ast.module_' Wasm.Source.phrase)*) =
                     (Shrink.string s.Source.it.Ast.init)))
                     m.it.Ast.data)
          <+>
+         (match m.it.Ast.start with
+          | None   -> empty
+          | Some _ -> return (as_phrase { m.it with Ast.start = None }))
+         <+>
          map (fun gs -> as_phrase { m.it with Ast.globals = gs })
            (Shrink.list ~shrink:(global_shrink m.it.Ast.globals) m.it.Ast.globals)
          <+>
