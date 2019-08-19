@@ -33,6 +33,7 @@ let unreachable_re = /(Unreachable Code)/;
 let stack_re = /(Out of stack space)/;
 let data_segment_re = /(Data segment is out of range)/;
 let mem_index_re = /(Memory index is out of range)/;
+let indirect_null_re = /(WebAssembly exported function expected)/;
 `);
       break;
     case "jsc":
@@ -44,6 +45,7 @@ let unreachable_re = /(Unreachable code should not be executed)/;
 let stack_re = /(Maximum call stack size exceeded)/;
 let data_segment_re = /(segment writes outside of memory)/;
 let mem_index_re = /(Out of bounds memory access)/;
+let indirect_null_re = /(call_indirect to a null table entry)/;
 `);
       break;
     case "sm":
@@ -55,6 +57,7 @@ let unreachable_re = /(unreachable executed)/;
 let stack_re = /(too much recursion)/;
 let data_segment_re = /(data segment does not fit in memory)/;
 let mem_index_re = /(index out of bounds)/;
+let indirect_null_re = /(indirect call to null)/;
 `);
         break;
     case "v8":
@@ -66,6 +69,7 @@ let unreachable_re = /(unreachable)/;
 let stack_re = /(Maximum call stack size exceeded)/;
 let data_segment_re = /(data segment is out of bounds)/;
 let mem_index_re = /(memory access out of bounds)/;
+let indirect_null_re = /(function signature mismatch)/;
 `);
         break;
   } 
@@ -83,6 +87,7 @@ function protected_run (f) {
        else if (unrepresentable_re.test(e.message)) print('unrepresentable')
        else if (data_segment_re.test(e.message))    print('data segment')
        else if (mem_index_re.test(e.message))       print('memory index out of bounds')
+       else if (indirect_null_re.test(e.message))   print('indirect call to null')
        else print(e)
   }
 }
