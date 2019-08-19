@@ -60,7 +60,7 @@ let mem_index_re = /(index out of bounds)/;
     case "v8":
       console.log(
 `let unrepresentable_re = /(unrepresentable in)/;
-let zero_div_re = /(divide by zero)/;
+let zero_div_re = /(divide|remainder) by zero/;
 let overflow_re = /(float unrepresentable in integer range)/;
 let unreachable_re = /(unreachable)/;
 let stack_re = /(Maximum call stack size exceeded)/;
@@ -74,19 +74,23 @@ console.log("let importObject = { imports: { log: print, logfl: printfl } };");
 console.log("let buffer = new Uint8Array(\[", b.toString(), "]);");
 console.log(
 `
-try {
-     let m = new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject);
-     print(m.exports.runi32());
-     printfl(m.exports.runf32());
-     printfl(m.exports.runf64());
-} catch(e) {
-     if (zero_div_re.test(e.message))             print('integer division by zero')
-     else if (unreachable_re.test(e.message))     print('unreachable code')
-     else if (stack_re.test(e.message))           print('stack overflow')
-     else if (overflow_re.test(e.message))        print('overflow')
-     else if (unrepresentable_re.test(e.message)) print('unrepresentable')
-     else if (data_segment_re.test(e.message))    print('data segment')
-     else if (mem_index_re.test(e.message))       print('memory index out of bounds')
-     else print(e)
+function protected_run (f) {
+  try { f(); } catch(e) {
+       if (zero_div_re.test(e.message))             print('integer division by zero')
+       else if (unreachable_re.test(e.message))     print('unreachable code')
+       else if (stack_re.test(e.message))           print('stack overflow')
+       else if (overflow_re.test(e.message))        print('overflow')
+       else if (unrepresentable_re.test(e.message)) print('unrepresentable')
+       else if (data_segment_re.test(e.message))    print('data segment')
+       else if (mem_index_re.test(e.message))       print('memory index out of bounds')
+       else print(e)
+  }
 }
+
+protected_run ( function () {
+    let m = new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject);
+    protected_run ( () => print(m.exports.runi32()) );
+    protected_run ( () => printfl(m.exports.runf32()) );
+    protected_run ( () => printfl(m.exports.runf64()) );
+  } )
 `);
