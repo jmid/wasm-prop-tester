@@ -495,15 +495,28 @@ let shrink_data s =
 let module_valid m = try Valid.check_module m; true with Valid.Invalid (_,_) -> false
 
 let module_shrink (m : Wasm.Ast.module_' Wasm.Source.phrase) =
-  Iter.(map (* shrink func bodies *)
+  Iter.((* shrink funcs and types combined *)
+        (try (* 3 imports, start, 3 exports *)
+          let fixed_ts,rest_ts = split 7 m.it.Ast.types in
+          let fixed_fs,rest_fs = split 4 m.it.Ast.funcs in
+          let rest = List.combine rest_ts rest_fs in
+          filter module_valid
+            (map
+               (fun rest' ->
+                  let rest_ts,rest_fs = List.split rest' in
+                  as_phrase { m.it with Ast.types = fixed_ts@rest_ts;
+                                        Ast.funcs = fixed_fs@rest_fs })
+               (Shrink.list rest))
+        with Invalid_argument _ -> Iter.empty)
+        <+>
+        map (* shrink func bodies *)
           (fun funs' -> as_phrase { m.it with Ast.funcs = funs' })
           (shrink_functions m.it.Ast.globals m.it.Ast.funcs m.it.Ast.types)
         <+> (* remove unneeded funcs *)
-        filter module_valid
-          (let fixed,rest = split 7 m.it.Ast.funcs in (* 3 imports, start, 3 exports *)
-           (map
-              (fun rest' -> as_phrase { m.it with Ast.funcs = fixed@rest' })
-              (Shrink.list rest)))
+        (let fixed,rest = split 4 m.it.Ast.funcs in (* start +3 exports, 3 imports not counted *)
+         (map
+            (fun rest' -> as_phrase { m.it with Ast.funcs = fixed@rest' })
+            (Shrink.list rest)))
         <+> (* shrink data segment *)
         map (fun ds -> as_phrase { m.it with Ast.data = ds })
           (Shrink.list ~shrink:shrink_data m.it.Ast.data)
