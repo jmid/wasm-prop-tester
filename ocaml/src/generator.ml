@@ -408,6 +408,9 @@ let rec instr_list_shrink gs is = match is with
        | Ast.Loop (sts,is') ->
          map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink gs is')
        | Ast.If (sts,is1,is2) ->
+         (of_list [(as_phrase Ast.Drop)::is1@is;
+                   (as_phrase Ast.Drop)::is2@is])
+         <+>
          (map (fun is' -> as_phrase (Ast.If (sts,is',is2))::is) (instr_list_shrink gs is1))
          <+>
          (map (fun is' -> as_phrase (Ast.If (sts,is1,is'))::is) (instr_list_shrink gs is2))
