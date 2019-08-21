@@ -524,28 +524,52 @@ let module_shrink (m : Wasm.Ast.module_' Wasm.Source.phrase) =
 
 let arb_module = make ~print:module_printer ~shrink:module_shrink module_gen
 
-let run_test =
-  let host_debug vs = match vs with
-    | [v] -> Printf.printf "%s\n" (Values.string_of_value v); []
-    | _ -> failwith (Printf.sprintf "host_debug called with %i arguments" (List.length vs)) in
-  Test.make ~name:"ref interpret run" ~count:100
-  arb_module
-  (function m ->
-     let debug0 = Func.alloc_host (Types.FuncType ([I32Type],[])) host_debug in
-     let debug1 = Func.alloc_host (Types.FuncType ([F32Type],[])) host_debug in
-     let debug2 = Func.alloc_host (Types.FuncType ([F64Type],[])) host_debug in
-     (*     try *)
-       let modinst =
-         Eval.init m [Instance.ExternFunc debug0;
-                      Instance.ExternFunc debug1;
-                      Instance.ExternFunc debug2] in
-       ignore(Eval.invoke (AstFunc (Types.FuncType ([],[]),
-                                    ref modinst,
-                                    List.hd m.Source.it.Ast.funcs)) []);
-       true
-(*     with (Error (_,"unreachable executed")) -> true
-         | _ -> false *)
-  )
+let host_debug vs = match vs with
+  | [v] -> Printf.printf "%s\n" (Values.string_of_value v); []
+  | _ -> failwith (Printf.sprintf "host_debug called with %i arguments" (List.length vs))
+
+let lookup name t =
+(*  Printf.printf "lookup: %s\n" (Utf8.encode name);
+    flush_all ();*)
+  match Utf8.encode name, t with
+  | "log",   Types.(ExternFuncType (FuncType ([I32Type],[]))) ->
+    Instance.ExternFunc (Func.alloc_host (Types.FuncType ([I32Type],[])) host_debug)
+  | "logfl", Types.(ExternFuncType (FuncType ([F32Type],[]))) ->
+    Instance.ExternFunc (Func.alloc_host (Types.FuncType ([F32Type],[])) host_debug)
+  | "logfl", Types.(ExternFuncType (FuncType ([F64Type],[]))) ->
+    Instance.ExternFunc (Func.alloc_host (Types.FuncType ([F64Type],[])) host_debug)
+  | _ -> raise Not_found
+
+let run_int_test =
+  Test.make ~name:"ref interpret internal run" ~count:1(*00*)
+    ((*set_shrink Shrink.nil*) arb_module)
+    (function m ->
+       try
+         Import.register (Utf8.decode "imports") lookup;
+         let inst = ref (Eval.init m (Import.link m)) in
+         let invoke n typ =
+           Eval.invoke (AstFunc (typ, inst, List.nth m.Source.it.Ast.funcs n)) [] in
+         ignore(host_debug (invoke 4 (Types.FuncType ([],[I32Type]))));
+         ignore(host_debug (invoke 5 (Types.FuncType ([],[F32Type]))));
+         ignore(host_debug (invoke 6 (Types.FuncType ([],[F64Type]))));
+         true
+       with Eval.Link (_,err) ->
+            Printf.printf "Link exception: %s\n" err; flush_all (); false
+          | Eval.Trap (_,err) ->
+            Printf.printf "Trap exception: %s\n" err; flush_all (); false
+          | Eval.Crash (_,err) ->
+            Printf.printf "Crash exception: %s\n" err; flush_all (); false
+          | Eval.Exhaustion (_,err) ->
+            Printf.printf "Exhaustion exception: %s\n" err; flush_all (); false
+          (* | _ -> false *)
+    )
+
+let run_ext_test =
+  Test.make ~name:"ref interpret external run" ~count:1(*00*)
+    arb_module
+    (function m ->
+       module_to_wat m wat_file_name;
+       Sys.command ("../spec/interpreter/wasm " ^ wat_file_name ^ " script.wast") = 0)
 
 let conversion_test =
   Test.make ~name:"Conversion" ~count:1000
