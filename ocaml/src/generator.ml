@@ -404,8 +404,20 @@ let rec instr_list_shrink gs is = match is with
        | Ast.Block (sts,[])  -> return is    (* remove empty block *)
        | Ast.Block (sts,is') ->
          map (fun is'' -> as_phrase (Ast.Block (sts,is''))::is) (instr_list_shrink gs is')
-       | Ast.Loop (sts,[])  -> return is     (* remove empty loop *)
        | Ast.Loop (sts,is') ->
+         (match sts with
+          | []  -> return is
+          | [t] ->
+            let zero = (match t with
+              | I32Type -> Values.I32 I32.zero
+              | I64Type -> Values.I64 I64.zero
+              | F32Type -> Values.F32 F32.zero
+              | F64Type -> Values.F64 F64.zero) in
+            return (as_phrase (Ast.Const (as_phrase zero))::is)
+          | _ -> empty)
+         <+>
+         return (is'@is)
+         <+>
          map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink gs is')
        | Ast.If (sts,is1,is2) ->
          (of_list [(as_phrase Ast.Drop)::is1@is;
