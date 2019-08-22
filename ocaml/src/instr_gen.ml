@@ -69,7 +69,7 @@ and instr_rule con t_opt size =
            (2, drop_gen con t_opt size);
            (2, block_gen con t_opt size);
            (2, loop_gen con t_opt size);
-           (1, call_gen con t_opt size);
+           (2, call_gen con t_opt size);
            (1, localSet_gen con t_opt size);
            (1, globalSet_gen con t_opt size);
            (6, store_gen con t_opt size);])
