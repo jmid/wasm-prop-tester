@@ -529,9 +529,10 @@ let module_shrink (m : Wasm.Ast.module_' Wasm.Source.phrase) =
           (shrink_functions m.it.Ast.globals m.it.Ast.funcs m.it.Ast.types)
         <+> (* remove unneeded funcs *)
         (let fixed,rest = split 4 m.it.Ast.funcs in (* start +3 exports, 3 imports not counted *)
-         (map
-            (fun rest' -> as_phrase { m.it with Ast.funcs = fixed@rest' })
-            (Shrink.list rest)))
+         filter module_valid
+           (map
+              (fun rest' -> as_phrase { m.it with Ast.funcs = fixed@rest' })
+              (Shrink.list rest)))
         <+> (* shrink data segment *)
         map (fun ds -> as_phrase { m.it with Ast.data = ds })
           (Shrink.list ~shrink:shrink_data m.it.Ast.data)
