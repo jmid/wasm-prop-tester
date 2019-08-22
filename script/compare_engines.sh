@@ -106,19 +106,25 @@ cmp -n 5000 $TMP_SM $TMP_V8 > $TMP_SM_V8 2>&1
 
 if [ -s "$TMP_CH_JSC" ] || [ -s "$TMP_JSC_SM" ] || [ -s "$TMP_SM_V8" ];
 then
-  # Save diff result, to avoid last shrinking step overwriting it
-  cp -f "$WAT_FILE"  "$TMP_DIR/prev.wat"
-  cp -f "$WASM_FILE" "$TMP_DIR/prev.wasm"
-  cp -f "$JS_CH_FILE"  "$TMP_DIR/prev_ch.js"
-  cp -f "$JS_JSC_FILE" "$TMP_DIR/prev_jsc.js"
-  cp -f "$JS_SM_FILE"  "$TMP_DIR/prev_sm.js"
-  cp -f "$JS_V8_FILE"  "$TMP_DIR/prev_v8.js"
-  cp -f "$TMP_CH"  "$TMP_DIR/prev_ch"
-  cp -f "$TMP_JSC" "$TMP_DIR/prev_jsc"
-  cp -f "$TMP_SM"  "$TMP_DIR/prev_sm"
-  cp -f "$TMP_V8"  "$TMP_DIR/prev_v8"
-  cp -f "$ERROR_FILE" "$TMP_DIR/prev_error"
-  exit 1
-else
+  # Test buggy behaviour
+    if [ $(grep -c 'tee_local' $WAT_FILE) -gt 0 ] && [ $(grep -c 'tee_local' $TMP CH) -gt 0 ];
+    then
+	exit 0
+    else
+	# Save diff result, to avoid last shrinking step overwriting it
+	cp -f "$WAT_FILE"  "$TMP_DIR/prev.wat"
+	cp -f "$WASM_FILE" "$TMP_DIR/prev.wasm"
+	cp -f "$JS_CH_FILE"  "$TMP_DIR/prev_ch.js"
+	cp -f "$JS_JSC_FILE" "$TMP_DIR/prev_jsc.js"
+	cp -f "$JS_SM_FILE"  "$TMP_DIR/prev_sm.js"
+	cp -f "$JS_V8_FILE"  "$TMP_DIR/prev_v8.js"
+	cp -f "$TMP_CH"  "$TMP_DIR/prev_ch"
+	cp -f "$TMP_JSC" "$TMP_DIR/prev_jsc"
+	cp -f "$TMP_SM"  "$TMP_DIR/prev_sm"
+	cp -f "$TMP_V8"  "$TMP_DIR/prev_v8"
+	cp -f "$ERROR_FILE" "$TMP_DIR/prev_error"
+	exit 1
+    fi
+    else
   exit 0
 fi
