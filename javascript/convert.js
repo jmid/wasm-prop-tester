@@ -13,10 +13,14 @@ console.log(
 `function printfl (f) {
     let s = f.toString();
     let slen = s.length;
-    if (s.includes('.') && slen > 16) {
+    if (slen > 16) {
+       if (s.includes('.')) {
 //	print(s.slice(0,slen-1));
 //	print(f.toFixed(12));
-	print(f.toFixed(14 - s.indexOf('.')));
+  	  print(f.toFixed(14 - s.indexOf('.')));
+       } else {
+//	  print(f.toFixed(12));
+       }
     } else {
 	print(s);
     }
