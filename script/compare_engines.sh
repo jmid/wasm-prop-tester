@@ -107,7 +107,7 @@ cmp -n 5000 $TMP_SM $TMP_V8 > $TMP_SM_V8 2>&1
 if [ -s "$TMP_CH_JSC" ] || [ -s "$TMP_JSC_SM" ] || [ -s "$TMP_SM_V8" ];
 then
   # Test buggy behaviour
-    if [ $(grep -c 'tee_local' $WAT_FILE) -gt 0 ] && [ $(grep -c 'tee_local' $TMP CH) -gt 0 ];
+    if [ $(grep -c 'local.tee' $WAT_FILE) -gt 0 ] && [ $(grep -c 'tee_local' $TMP_CH) -gt 0 ];
     then
 	exit 0
     else
