@@ -71,6 +71,8 @@ let unary_number     = instr_number (function Ast.Unary _ -> true | _ -> false)
 let binary_number    = instr_number (function Ast.Binary _ -> true | _ -> false)
 let convert_number   = instr_number (function Ast.Convert _ -> true | _ -> false)
 
+let print_number = instr_number (function Ast.Call v -> List.mem v.it [0l;1l;2l] | _ -> false)
+
 let stat_to_file m = 
   let oc = open_out_gen [Open_append; Open_creat] 0o666 stat_file_name in
     Printf.fprintf oc "%d;%d;%d;%d;%d;%d;%d;%d\n" (funcs_number m) (call_func_length m) (funcs_length m) (elems_length m) (globals_length m) (data_length m) (call_number m) (callindir_number m);
@@ -130,6 +132,8 @@ let stat_test =
         ("unary %",        percentage unary_number);
         ("binary %",       percentage binary_number);
         ("convert %",      percentage convert_number);
+
+        ("print num",      print_number);
        ]
        arb_module)
     (fun m -> true)
