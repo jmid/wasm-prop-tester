@@ -65,7 +65,8 @@ and instr_rule con t_opt size =
            (1, localSet_gen con t_opt size);
            (1, globalSet_gen con t_opt size);]
         | _ ->
-          [(1, nop_gen con t_opt size);
+          [(8, unreachable_gen con t_opt size);
+           (1, nop_gen con t_opt size);
            (2, drop_gen con t_opt size);
            (2, block_gen con t_opt size);
            (2, loop_gen con t_opt size);
@@ -82,7 +83,7 @@ and instr_rule con t_opt size =
             | I32Type      ->
               [(8, unreachable_gen con t_opt size);
                (1, nop_gen con t_opt size);
-               (*(1, drop_gen con t_opt size);*)
+               (1, drop_gen con t_opt size);
                (8, select_gen con t_opt size);
                (2, block_gen con t_opt size);
                (2, loop_gen con t_opt size);
@@ -114,7 +115,7 @@ and instr_rule con t_opt size =
               [
                 (8, unreachable_gen con t_opt size);
                 (1, nop_gen con t_opt size);
-                (*(1, drop_gen con t_opt size);*)
+                (1, drop_gen con t_opt size);
                 (8, select_gen con t_opt size);
                 (2, block_gen con t_opt size);
                 (6, loop_gen con t_opt size);
@@ -368,11 +369,12 @@ and cvtop_gen con t_opt size = match t_opt with
 (**** Parametric Instructions ****)
 (*** Drop ***)
 (** drop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
-and drop_gen con t_opt size = match t_opt with
-| Some _ -> Gen.return None
-| None   ->
+and drop_gen con t_opt size =
+  let stack_rest = match t_opt with
+    | Some t' -> [t']
+    | None    -> [] in
   Gen.(map
-         (fun t -> Some (con, as_phrase Ast.Drop, [t]))
+         (fun t -> Some (con, as_phrase Ast.Drop, t::stack_rest))
          (oneofl [I32Type; I64Type; F32Type; F64Type]))
 
 (*** Select ***)
