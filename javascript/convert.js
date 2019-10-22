@@ -56,7 +56,7 @@ let indirect_null_re = /(call_indirect to a null table entry)/;
       console.log(
 `let unrepresentable_re = /(unrepresentable in)/;
 let zero_div_re = /(integer divide by zero)/;
-let overflow_re = /(integer overflow)/;
+let overflow_re = /(invalid conversion to integer)|(integer overflow)/;
 let unreachable_re = /(unreachable executed)/;
 let stack_re = /(too much recursion)/;
 let data_segment_re = /(data segment does not fit in memory)/;
