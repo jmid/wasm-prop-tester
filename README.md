@@ -15,21 +15,24 @@ abstract syntax tree (in OCaml).
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
 * WebAssembly reference interpreter, from spec: [WebAssembly spec](https://github.com/WebAssembly/spec)
+  Assuming it is installed in the `spec` sub-directory:
 ```
-PATH="$PATH:$HOME/Thesis/spec/interpreter"
+export PATH="$PATH:$PWD/spec/interpreter"
 ```
 
 * WebAssembly binary toolkit: [WebAssembly wabt](https://github.com/WebAssembly/wabt)
+  Assuming it is installed in the `wabt` sub-directory:
 ```
-PATH="$PATH:$HOME/Thesis/wabt/out/clang/Debug"
+export PATH="$PATH:$PWD/wabt/bin"
 ```
 
 * JavaScript (engine) Version Updater: [jsvu](https://github.com/GoogleChromeLabs/jsvu)
 ```
-PATH="$PATH:$HOME/.jsvu"
+export PATH="$PATH:$HOME/.jsvu"
 ```
 
 * Eshost CLI: [eshost-cli](https://github.com/bterlson/eshost-cli)
+  (no longer a requirement)
 
 
 ## Issues Found
