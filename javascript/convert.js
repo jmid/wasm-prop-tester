@@ -11,6 +11,8 @@ const b = new Uint8Array(buf);
 
 console.log(
 `function printfl (f) {
+    print(f.toString(2));
+/*
     let s = f.toString();
     let slen = s.length;
     if (slen > 16) {
@@ -24,6 +26,7 @@ console.log(
     } else {
 	print(s);
     }
+*/
 }
 `);
 
