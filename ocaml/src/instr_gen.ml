@@ -65,7 +65,7 @@ and instr_rule con t_opt size =
            (1, localSet_gen con t_opt size);
            (1, globalSet_gen con t_opt size);]
         | _ ->
-          [(8, unreachable_gen con t_opt size);
+          [(6, unreachable_gen con t_opt size);
            (1, nop_gen con t_opt size);
            (2, drop_gen con t_opt size);
            (2, block_gen con t_opt size);
@@ -81,7 +81,7 @@ and instr_rule con t_opt size =
            (1, globalGet_gen con t_opt size);]
         | n -> (match t with
             | I32Type      ->
-              [(8, unreachable_gen con t_opt size);
+              [(6, unreachable_gen con t_opt size);
                (1, nop_gen con t_opt size);
                (1, drop_gen con t_opt size);
                (8, select_gen con t_opt size);
@@ -113,7 +113,7 @@ and instr_rule con t_opt size =
               ]
             | I64Type | F32Type | F64Type ->
               [
-                (8, unreachable_gen con t_opt size);
+                (6, unreachable_gen con t_opt size);
                 (1, nop_gen con t_opt size);
                 (1, drop_gen con t_opt size);
                 (8, select_gen con t_opt size);
