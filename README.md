@@ -26,7 +26,9 @@ export PATH="$PATH:$HOME/.jsvu"
 ```
 
 
-# Former Dependencies
+### Former Dependencies
+
+Previous versions of the tester have depended on the following software.
 
 * WebAssembly binary toolkit: [WebAssembly wabt](https://github.com/WebAssembly/wabt)
   Assuming it is installed in the `wabt` sub-directory:
@@ -36,6 +38,24 @@ export PATH="$PATH:$PWD/wabt/bin"
 * Eshost CLI: [eshost-cli](https://github.com/bterlson/eshost-cli)
   (no longer a requirement)
 
+
+## Running
+
+With a recent OCaml installed, compiling should be as simple as:
+```
+  make
+```
+
+Once compiled and the `PATH` setup, you can run the tests with:
+```
+  ./main.native -v
+```
+
+For fun, you can run a loop that continues restarting the test runner
+until it finds a counterexample:
+```
+  while ./main.native -v; do :; done
+```
 
 ## Issues Found
 
