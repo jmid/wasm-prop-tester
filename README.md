@@ -20,17 +20,19 @@ abstract syntax tree (in OCaml).
 export PATH="$PATH:$PWD/spec/interpreter"
 ```
 
-* WebAssembly binary toolkit: [WebAssembly wabt](https://github.com/WebAssembly/wabt)
-  Assuming it is installed in the `wabt` sub-directory:
-```
-export PATH="$PATH:$PWD/wabt/bin"
-```
-
 * JavaScript (engine) Version Updater: [jsvu](https://github.com/GoogleChromeLabs/jsvu)
 ```
 export PATH="$PATH:$HOME/.jsvu"
 ```
 
+
+# Former Dependencies
+
+* WebAssembly binary toolkit: [WebAssembly wabt](https://github.com/WebAssembly/wabt)
+  Assuming it is installed in the `wabt` sub-directory:
+```
+export PATH="$PATH:$PWD/wabt/bin"
+```
 * Eshost CLI: [eshost-cli](https://github.com/bterlson/eshost-cli)
   (no longer a requirement)
 
