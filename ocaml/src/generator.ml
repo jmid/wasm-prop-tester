@@ -450,7 +450,7 @@ let rec instr_list_shrink gs is = match is with
             return (as_phrase (Ast.Const (as_phrase zero))::is)
           | _ -> empty)
          <+>
-         return (is'@is)
+         (if contains_label is' then empty else return (is'@is))
          <+>
          map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink gs is')
        | Ast.If (sts,is1,is2) ->
