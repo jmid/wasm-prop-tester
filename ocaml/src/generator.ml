@@ -362,6 +362,40 @@ let rec max_global il = match il with
     | Ast.GlobalSet v -> max v.it (max_global rst)
     | _               -> max_global rst
 
+let rec contains_label is = match is with
+  | [] -> false
+  | i::is ->
+    (match i.Source.it with
+     | Ast.Unreachable
+     | Ast.Nop
+     | Ast.Drop
+     | Ast.Select
+     | Ast.Return
+     | Ast.Call _
+     | Ast.CallIndirect _
+     | Ast.LocalGet _
+     | Ast.LocalSet _
+     | Ast.LocalTee _
+     | Ast.GlobalGet _
+     | Ast.GlobalSet _
+     | Ast.Load _
+     | Ast.Store _
+     | Ast.MemorySize
+     | Ast.MemoryGrow
+     | Ast.Const _
+     | Ast.Test _
+     | Ast.Compare _
+     | Ast.Unary _
+     | Ast.Binary _
+     | Ast.Convert _ -> false
+     | Ast.Block (_,js) -> contains_label js
+     | Ast.Loop (_,js) -> contains_label js
+     | Ast.If (_,is1,is2) -> contains_label is1 || contains_label is2
+     | Ast.Br _ -> true
+     | Ast.BrIf _ -> true
+     | Ast.BrTable (_,_) -> true
+     ) || contains_label is
+  
 let rec instr_list_shrink gs is = match is with
   | [] -> Iter.empty
   | i::is ->
@@ -420,8 +454,9 @@ let rec instr_list_shrink gs is = match is with
          <+>
          map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink gs is')
        | Ast.If (sts,is1,is2) ->
-         (of_list [(as_phrase Ast.Drop)::is1@is;
-                   (as_phrase Ast.Drop)::is2@is])
+         (if contains_label is1 then empty else return ((as_phrase Ast.Drop)::is1@is))
+         <+>
+         (if contains_label is2 then empty else return ((as_phrase Ast.Drop)::is2@is))
          <+>
          (map (fun is' -> as_phrase (Ast.If (sts,is',is2))::is) (instr_list_shrink gs is1))
          <+>
