@@ -417,7 +417,10 @@ let rec instr_list_shrink gs is = match is with
            | Ast.LocalGet _ , Ast.GlobalSet _ -> return is
            | Ast.Const _    , Ast.If (_,is1,is2)
            | Ast.LocalGet _ , Ast.If (_,is1,is2)
-           | Ast.GlobalGet _, Ast.If (_,is1,is2) -> of_list [is1@is; is2@is]
+           | Ast.GlobalGet _, Ast.If (_,is1,is2) ->
+             (if contains_label is1 then empty else return (is1@is))
+             <+>
+             (if contains_label is2 then empty else return (is2@is))
            | _, _ -> empty))
       <+>
       (match i.Source.it with
