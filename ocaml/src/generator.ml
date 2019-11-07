@@ -535,9 +535,11 @@ let rec shrink_functions gs (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
                     | F32Type -> Values.F32 F32.zero
                     | F64Type -> Values.F64 F64.zero in
                 return [as_phrase (Ast.Const (as_phrase last))]
-              | _ -> empty)
-              <+>
-              instr_list_shrink gs f.Source.it.Ast.body))
+              | _ -> empty)))
+      <+>
+      (map
+         (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
+         (instr_list_shrink gs f.Source.it.Ast.body))
       <+>
       map (fun fs' -> f::fs') (shrink_functions gs fs types))
 
