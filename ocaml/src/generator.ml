@@ -402,19 +402,52 @@ let rec instr_list_shrink gs is = match is with
     Iter.(
       (match is with
        | [] -> Iter.empty
-       | j::is -> (match i.Source.it,j.Source.it with
+       | j::is ->
+         (match is with
+          | [] -> empty
+          | k::is ->
+            (match i.Source.it,j.Source.it,k.Source.it with
+             | Ast.Const _    , Ast.Const _    , Ast.Select
+             | Ast.Const _    , Ast.LocalGet _ , Ast.Select
+             | Ast.Const _    , Ast.GlobalGet _, Ast.Select
+             | Ast.LocalGet _ , Ast.Const _    , Ast.Select
+             | Ast.LocalGet _ , Ast.LocalGet _ , Ast.Select
+             | Ast.LocalGet _ , Ast.GlobalGet _, Ast.Select
+             | Ast.GlobalGet _, Ast.Const _    , Ast.Select
+             | Ast.GlobalGet _, Ast.LocalGet _ , Ast.Select
+             | Ast.GlobalGet _, Ast.GlobalGet _, Ast.Select -> return is
+             | Ast.Const _    , Ast.Const _    , Ast.Compare _
+             | Ast.Const _    , Ast.LocalGet _ , Ast.Compare _
+             | Ast.Const _    , Ast.GlobalGet _, Ast.Compare _
+             | Ast.LocalGet _ , Ast.Const _    , Ast.Compare _
+             | Ast.LocalGet _ , Ast.LocalGet _ , Ast.Compare _
+             | Ast.LocalGet _ , Ast.GlobalGet _, Ast.Compare _
+             | Ast.GlobalGet _, Ast.Const _    , Ast.Compare _
+             | Ast.GlobalGet _, Ast.LocalGet _ , Ast.Compare _
+             | Ast.GlobalGet _, Ast.GlobalGet _, Ast.Compare _ ->
+               return ((as_phrase (Ast.Const (as_phrase (Values.I32 I32.zero))))::is)
+             | _, _, _ -> empty))
+         <+>
+         (match i.Source.it,j.Source.it with
            | Ast.Const _    , Ast.BrIf _
            | Ast.LocalGet _ , Ast.BrIf _
            | Ast.GlobalGet _, Ast.BrIf _
            | Ast.Const _    , Ast.Drop
            | Ast.LocalGet _ , Ast.Drop
            | Ast.GlobalGet _, Ast.Drop
+           | Ast.Const _    , Ast.Binary _
+           | Ast.LocalGet _ , Ast.Binary _
+           | Ast.GlobalGet _, Ast.Binary _
            | Ast.Const _, Ast.LocalSet _
            | Ast.Const _, Ast.GlobalSet _
            | Ast.GlobalGet _, Ast.GlobalSet _
            | Ast.LocalGet _ , Ast.LocalSet _
            | Ast.GlobalGet _, Ast.LocalSet _
            | Ast.LocalGet _ , Ast.GlobalSet _ -> return is
+           | Ast.Const _    , Ast.Test _
+           | Ast.LocalGet _ , Ast.Test _
+           | Ast.GlobalGet _, Ast.Test _ ->
+             return ((as_phrase (Ast.Const (as_phrase (Values.I32 I32.zero))))::is)
            | Ast.Const _    , Ast.If (_,is1,is2)
            | Ast.LocalGet _ , Ast.If (_,is1,is2)
            | Ast.GlobalGet _, Ast.If (_,is1,is2) ->
@@ -425,7 +458,9 @@ let rec instr_list_shrink gs is = match is with
       <+>
       (match i.Source.it with
        | Ast.Nop
-       | Ast.LocalTee _ -> return is         (* no change in stack -> omit *)
+       | Ast.LocalTee _
+       | Ast.MemoryGrow
+       | Ast.Unary _    -> return is         (* no change in stack -> omit *)
        | Ast.GlobalSet g ->                  (* change GlobalSets into Drop *)
          return ((as_phrase Ast.Drop)::is)
        | Ast.GlobalGet g ->                  (* change GlobalGets into Consts *)
