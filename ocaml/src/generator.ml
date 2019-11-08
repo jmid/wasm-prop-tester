@@ -463,14 +463,29 @@ let rec instr_list_shrink gs is = match is with
        | Ast.Unary _    -> return is         (* no change in stack -> omit *)
        | Ast.GlobalSet g ->                  (* change GlobalSets into Drop *)
          return ((as_phrase Ast.Drop)::is)
+         <+> (* or replace GlobalSet with another, lower-indexed one *)
+         (let glob = List.nth gs (Int32.to_int g.it) in
+          let gtype = glob.Source.it.Ast.gtype in
+          let i = find_global_index (fun g -> gtype = g.Source.it.Ast.gtype) gs in
+          if i < (Int32.to_int g.it)
+          then return (as_phrase (Ast.GlobalSet (as_phrase (I32.of_int_s i)))::is)
+          else empty)
        | Ast.GlobalGet g ->                  (* change GlobalGets into Consts *)
          let glob = List.nth gs (Int32.to_int g.it) in
-         let zero = (match glob.Source.it.Ast.gtype with
-          | GlobalType (I32Type,_) -> Values.I32 I32.zero
-          | GlobalType (I64Type,_) -> Values.I64 I64.zero
-          | GlobalType (F32Type,_) -> Values.F32 F32.zero
-          | GlobalType (F64Type,_) -> Values.F64 F64.zero) in
-         return ((as_phrase (Ast.Const (as_phrase zero)))::is)
+         (let zero = (match glob.Source.it.Ast.gtype with
+              | GlobalType (I32Type,_) -> Values.I32 I32.zero
+              | GlobalType (I64Type,_) -> Values.I64 I64.zero
+              | GlobalType (F32Type,_) -> Values.F32 F32.zero
+              | GlobalType (F64Type,_) -> Values.F64 F64.zero) in
+          return ((as_phrase (Ast.Const (as_phrase zero)))::is))
+         <+> (* or replace GlobalGet with another, lower-indexed one *)
+         (let Wasm.Types.GlobalType (vtype,_) = glob.Source.it.Ast.gtype in
+          let i = find_global_index
+                    (fun g -> let Wasm.Types.GlobalType (vtype',_) = g.Source.it.Ast.gtype in
+                              vtype = vtype') gs in
+          if i < (Int32.to_int g.it)
+          then return (as_phrase (Ast.GlobalGet (as_phrase (I32.of_int_s i)))::is)
+          else empty)
        | Ast.Return ->
          if is=[] then empty else return [i] (* delete instrs after return *)
        | Ast.Block (sts,[])  -> return is    (* remove empty block *)
