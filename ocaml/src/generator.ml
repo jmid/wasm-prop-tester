@@ -622,6 +622,12 @@ let module_shrink (m : Wasm.Ast.module_' Wasm.Source.phrase) =
         <+> (* reduce declared types *)
         filter module_valid
           (map (fun ts -> as_phrase { m.it with Ast.types = ts }) (Shrink.list m.it.Ast.types))
+        <+> (* reduce tables *)
+        filter module_valid
+          (map (fun tbs -> as_phrase { m.it with Ast.tables = tbs }) (Shrink.list m.it.Ast.tables))
+        <+> (* reduce memories *)
+        filter module_valid
+          (map (fun ms -> as_phrase { m.it with Ast.memories = ms }) (Shrink.list m.it.Ast.memories))
         <+> (* shrink elems *)
         filter module_valid
           (map (fun es -> as_phrase { m.it with Ast.elems = es }) (Shrink.list m.it.Ast.elems)))
