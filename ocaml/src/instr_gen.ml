@@ -5,6 +5,52 @@ open Helper
 let addLabel t_option con =
   { con with labels = t_option::con.labels; }
 
+let i32_gen =
+  let corner_gen =
+    Gen.oneofl [ Int32.min_int; Int32.max_int;
+               (*0x7fffffffl; 0x80000000l; 0x80000001l; (*0x00000000l;*)
+                 0x3fffffffl; (*0x01234567l; 0x8ff00ff0l;*) 0x40000000l;*)
+                 (*0xabcd9876l; 0xfe00dc00l; 0xb0c1d2e3l; 0x769abcdfl*) ] in
+  Gen.(frequency [ 1, corner_gen;
+                   3, map Int32.of_int small_signed_int;
+                   5, ui32; ])
+
+let i64_gen =
+  let corner_gen =
+    Gen.oneofl [ Int64.min_int; Int64.max_int;
+                (*(*0x7fffffffffffffffL;*) 0x8000000000000000L; 0x3fffffffL;
+                 0x0123456789abcdefL; 0x8ff00ff00ff00ff0L; 0xf0f0ffffL;
+                 0x4000000000000000L; 0xabcd1234ef567809L; 0xabd1234ef567809cL;
+                 0xabcd987602468aceL; 0xfe000000dc000000L; 0x00008000L;
+                 0x00010000L; 0xAAAAAAAA55555555L; 0x99999999AAAAAAAAL;
+                   0xDEADBEEFDEADBEEFL*) ] in
+  Gen.(frequency [ 1, corner_gen;
+                   3, map Int64.of_int small_signed_int;
+                   5, ui64; ])
+
+let f32_gen =
+  let corner_gen =
+    Gen.oneofl
+      (List.map F32.of_string
+         [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "nan";
+           (*"0x1p-126"; "-0x1p-126"; "0x1.921fb6p+2"; "-0x1.921fb6p+2";*)
+           "0x1.fffffep+127"; "-0x1.fffffep+127"]) in
+  Gen.(frequency [ 1, corner_gen;
+                   3, map F32.of_float float;
+                   5, map F32.of_bits ui32; ])
+
+let f64_gen =
+  let corner_gen =
+    Gen.oneofl
+      (List.map F64.of_string
+         [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "nan";
+           "0x1p-1"; "-0x1p-1"; "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022";
+           (*"0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2";*)
+           "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"]) in
+  Gen.(frequency [ 1, corner_gen;
+                   3, map F64.of_float float;
+                   5, map F64.of_bits ui64; ])
+
 (*
 type instr = instr' Source.phrase
 and instr' =
@@ -164,52 +210,14 @@ and generate_rule rules =
 (** const_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and const_gen con t_opt size = match t_opt with
   | None -> Gen.return None
-  | Some I32Type -> Gen.(
-      let corner_gen =
-        oneofl [ 0x7fffffffl; 0x80000000l; 0x80000001l; 0x00000000l;
-                 0x3fffffffl; 0x01234567l; 0x8ff00ff0l; 0x40000000l;
-                 0xabcd9876l; 0xfe00dc00l; 0xb0c1d2e3l; 0x769abcdfl ] in
-      map
-      (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 i))), []))
-      (frequency [ 2, corner_gen; 2, ui32; ])
-    )
-  | Some I64Type -> Gen.(
-      let corner_gen =
-        oneofl [ (*0x7fffffffffffffffL;*) 0x8000000000000000L; 0x3fffffffL;
-                 0x0123456789abcdefL; 0x8ff00ff00ff00ff0L; 0xf0f0ffffL;
-                 0x4000000000000000L; 0xabcd1234ef567809L; 0xabd1234ef567809cL;
-                 0xabcd987602468aceL; 0xfe000000dc000000L; 0x00008000L;
-                 0x00010000L; 0xAAAAAAAA55555555L; 0x99999999AAAAAAAAL;
-                 0xDEADBEEFDEADBEEFL ] in
-      map
-      (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I64 i))), []))
-      (frequency [ 2, corner_gen; 2, ui64; ])
-    )
-  | Some F32Type -> Gen.(
-    let corner_gen = 
-      map
-      F32.of_string
-      (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-149"; "-0x1p-149"; "0x1p-126";
-                "-0x1p-126"; "0x1.921fb6p+2"; "-0x1.921fb6p+2"; "0x1.fffffep+127";
-                "-0x1.fffffep+127"]) in
-    let f32 = map F32.of_float float in
-      map
-      (fun f -> Some (con, as_phrase (Ast.Const (as_phrase (Values.F32 f))), []))
-      (frequency [ 2, corner_gen; 2, f32; ])
-    )
-  | Some F64Type -> Gen.(
-    let corner_gen = 
-      map
-      F64.of_string
-      (oneofl [ "inf"; "-inf"; "0x0p+0"; "-0x0p+0"; "0x1p-1022"; "-0x1p-1022"; "0x1p-1";
-                "-0x1p-1"; "0x0.0000000000001p-1022"; "-0x0.0000000000001p-1022";
-                "0x1.921fb54442d18p+2"; "-0x1.921fb54442d18p+2";
-                "0x1.fffffffffffffp+1023"; "-0x1.fffffffffffffp+1023"]) in
-    let f64 = map F64.of_float float in
-      map
-      (fun f -> Some (con, as_phrase (Ast.Const (as_phrase (Values.F64 f))), []))
-      (frequency [ 2, corner_gen; 2, f64; ])
-    )
+  | Some I32Type ->
+    Gen.map (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I32 i))), [])) i32_gen
+  | Some I64Type ->
+    Gen.map (fun i -> Some (con, as_phrase (Ast.Const (as_phrase (Values.I64 i))), [])) i64_gen
+  | Some F32Type ->
+    Gen.map (fun f -> Some (con, as_phrase (Ast.Const (as_phrase (Values.F32 f))), [])) f32_gen
+  | Some F64Type ->
+    Gen.map (fun f -> Some (con, as_phrase (Ast.Const (as_phrase (Values.F64 f))), [])) f64_gen
   | Some MemIndexType -> (match con.mems with
       | None     -> Gen.return None
       | Some mem -> 
