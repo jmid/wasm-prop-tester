@@ -173,3 +173,11 @@ let rec log2 n = match n with
   | 0 -> 0
   | 1 -> 0
   | _ -> 1 + log2 (n lsr 1)
+
+
+(*  find_global_index : (Ast.global -> bool) -> Ast.global list -> int  *)
+let find_global_index p gs =
+  let rec loop i gs = match gs with
+    | [] -> failwith "find_global: not found"
+    | g::gs -> if p g then i else loop (i+1) gs in
+  loop 0 gs
