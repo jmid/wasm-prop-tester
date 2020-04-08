@@ -9,26 +9,7 @@ if (process.argv.length !== 4) {
 const buf = fs.readFileSync(process.argv[2]);
 const b = new Uint8Array(buf);
 
-console.log(
-`function printfl (f) {
-    print(f.toString(2));
-/*
-    let s = f.toString();
-    let slen = s.length;
-    if (slen > 16) {
-       if (s.includes('.')) {
-//	print(s.slice(0,slen-1));
-//	print(f.toFixed(12));
-  	  print(f.toFixed(14 - s.indexOf('.')));
-       } else {
-//	  print(f.toFixed(12));
-       }
-    } else {
-	print(s);
-    }
-*/
-}
-`);
+console.log("function printfl (f) { print(f.toString(2)); }");
 
 switch(process.argv[3]) {
     case "ch":
@@ -81,7 +62,7 @@ let indirect_re = /(function signature mismatch)/;
         break;
   } 
 
-console.log("let importObject = { imports: { log: print, logfl: printfl } };");
+console.log("let importObject = { imports: { log: printfl, logfl: printfl } };");
 console.log("let buffer = new Uint8Array(\[", b.toString(), "]);");
 console.log(
 `
@@ -95,13 +76,13 @@ function protected_run (f) {
        else name = e.name
 
        if (zero_div_re.test(e.message))             print(name, 'integer division by zero')
-       else if (unreachable_re.test(e.message))     print(name, 'unreachable code')
+       else if (unreachable_re.test(e.message))     print(name, 'unreachable executed')
        else if (stack_re.test(e.message))           print('stack overflow')
        // v8, jsc: RangeError, sm: InternalError, ch: Error
-       else if (overflow_re.test(e.message))        print(name, 'overflow')
+       else if (overflow_re.test(e.message))        print(name, 'invalid conversion to integer or overflow')
        else if (unrepresentable_re.test(e.message)) print(name, 'unrepresentable')
-       else if (data_segment_re.test(e.message))    print(name, 'data segment')
-       else if (mem_index_re.test(e.message))       print(name, 'memory index out of bounds')
+       else if (data_segment_re.test(e.message))    print(name, 'data segment does not fit memory')
+       else if (mem_index_re.test(e.message))       print(name, 'out of bounds memory access')
        else if (indirect_re.test(e.message))   print(name, 'indirect call error')
        else print(name, e)
   }
@@ -109,8 +90,9 @@ function protected_run (f) {
 
 protected_run ( function () {
     let m = new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject);
-    protected_run ( () => print(m.exports.runi32()) );
-    protected_run ( () => printfl(m.exports.runf32()) );
-    protected_run ( () => printfl(m.exports.runf64()) );
+    for (const [f] of Object.entries(m.exports).sort((a, b) => a[0].localeCompare(b[0]))) {
+      print(f);
+      protected_run ( () => printfl(m.exports[f]()));
+    }
   } )
 `);
