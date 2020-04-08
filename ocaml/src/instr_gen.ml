@@ -51,6 +51,19 @@ let f64_gen =
                    3, map F64.of_float float;
                    5, map F64.of_bits ui64; ])
 
+(** value_type_gen : value_type Gen.t **)
+let value_type_gen = Gen.oneofl [I32Type; I64Type; F32Type; F64Type]
+
+(** value_type_opt_gen : value_type option Gen.t **)
+let value_type_opt_gen =
+  Gen.(frequency
+         [ 1, return None;
+           3, map (fun t -> Some t) value_type_gen
+         ])
+
+(** stack_type_gen : int -> value_type list **)
+let stack_type_gen n = Gen.list_repeat n value_type_gen
+
 (*
 type instr = instr' Source.phrase
 and instr' =
@@ -85,12 +98,12 @@ and instr' =
 *)
 
 (*** Instructions list generator ***)
-(** instrs_rule : context_ -> value_type list -> value_type list -> int -> (instr list) option Gen.t **)
+(** instrs_rule : context_ -> value_type list -> int -> (instr list) option Gen.t **)
 let rec instrs_rule context output_ts size =
-  let recgen con t_opt tr = Gen.(instr_rule con t_opt (size/2) >>= function
+  let recgen con t_opt tr = Gen.(instr_rule con t_opt (size/4) >>= function
     | None              -> return None
     | Some (con', instr', ts')  ->
-      instrs_rule con' (ts'@tr) (size/2) >>= (function
+      instrs_rule con' (ts'@tr) (3*size/4) >>= (function
           | None        -> return None
           | Some instrs -> return (Some (instr'::instrs)))) in
   match output_ts with
@@ -102,7 +115,7 @@ let rec instrs_rule context output_ts size =
     let non_empty_gen = recgen context (Some t1) trst in
     Gen.frequency [ 1, empty_gen; 4, non_empty_gen; ]
 
-(** instr_rule : context_ -> value_type option -> int -> (instr * value_type list) option Gen.t **)
+(** instr_rule : context_ -> value_type option -> int -> (context * instr * value_type list) option Gen.t **)
 and instr_rule con t_opt size =
   let rules = match t_opt with
     | None   -> (match size with
@@ -244,19 +257,19 @@ and floatOp_unop_gen =
 and unop_gen con t_opt size = match t_opt with
   | Some I32Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I32 op)), [I32Type])))
+      (fun op -> Some (con, as_phrase (Ast.Unary (Values.I32 op)), [I32Type]))
       intOp_unop_gen
   | Some I64Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.I64 op)), [I64Type])))
+      (fun op -> Some (con, as_phrase (Ast.Unary (Values.I64 op)), [I64Type]))
       intOp_unop_gen
   | Some F32Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F32 op)), [F32Type])))
+      (fun op -> Some (con, as_phrase (Ast.Unary (Values.F32 op)), [F32Type]))
       floatOp_unop_gen
   | Some F64Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Unary (Values.F64 op)), [F64Type])))
+      (fun op -> Some (con, as_phrase (Ast.Unary (Values.F64 op)), [F64Type]))
       floatOp_unop_gen
   | Some _ | None -> Gen.return None
 
@@ -278,19 +291,19 @@ and floatOp_binop_gen =
 and binop_gen con t_opt size = match t_opt with
   | Some I32Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.I32 op)), [I32Type; I32Type])))
+      (fun op -> Some (con, as_phrase (Ast.Binary (Values.I32 op)), [I32Type; I32Type]))
       intOp_binop_gen
   | Some I64Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.I64 op)), [I64Type; I64Type])))
+      (fun op -> Some (con, as_phrase (Ast.Binary (Values.I64 op)), [I64Type; I64Type]))
       intOp_binop_gen
   | Some F32Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.F32 op)), [F32Type; F32Type])))
+      (fun op -> Some (con, as_phrase (Ast.Binary (Values.F32 op)), [F32Type; F32Type]))
       floatOp_binop_gen
   | Some F64Type ->
     Gen.map
-      (fun op -> (Some (con, as_phrase (Ast.Binary (Values.F64 op)), [F64Type; F64Type])))
+      (fun op -> Some (con, as_phrase (Ast.Binary (Values.F64 op)), [F64Type; F64Type]))
       floatOp_binop_gen
   | Some _ | None -> Gen.return None
 
@@ -381,9 +394,7 @@ and drop_gen con t_opt size =
   let stack_rest = match t_opt with
     | Some t' -> [t']
     | None    -> [] in
-  Gen.(map
-         (fun t -> Some (con, as_phrase Ast.Drop, t::stack_rest))
-         (oneofl [I32Type; I64Type; F32Type; F64Type]))
+  Gen.map (fun t -> Some (con, as_phrase Ast.Drop, t::stack_rest)) value_type_gen
 
 (*** Select ***)
 (** select_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -449,7 +460,7 @@ and globalGet_gen (con: context_) t_opt size = match t_opt with
 and globalSet_gen (con: context_) t_opt size = match t_opt with
   | Some t -> Gen.return None
   | None ->
-    Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t ->
+    Gen.(value_type_gen >>= fun t ->
          let globals = get_global_indexes t con.globals (Some Types.Mutable) in
          if globals = []
          then Gen.return None
@@ -503,7 +514,7 @@ and store_gen con t_opt size = match con.mems with
     | None   ->
       if (Int32.to_int m.min) < 1
       then Gen.return None
-      else Gen.(oneofl [I32Type; I64Type; F32Type; F64Type] >>= fun t -> (match t with
+      else Gen.(value_type_gen >>= fun t -> (match t with
           | I32Type -> opt (oneofl Memory.([Pack8;Pack16]))
           | I64Type -> opt (oneofl Memory.([Pack8;Pack16;Pack32]))
           | F32Type
@@ -523,7 +534,7 @@ and store_gen con t_opt size = match con.mems with
 and memorysize_gen con t_opt size = match t_opt with
   | Some I32Type  -> (match con.mems with
     | None    -> Gen.return None
-    | Some _  -> Gen.return (Some (con, as_phrase (Ast.MemorySize), [])))
+    | Some _  -> Gen.return (Some (con, as_phrase Ast.MemorySize, [])))
   | Some _ | None       -> Gen.return None
 
 (*** MemoryGrow ***)
@@ -531,21 +542,22 @@ and memorysize_gen con t_opt size = match t_opt with
 and memorygrow_gen con t_opt size = match t_opt with
   | Some I32Type  -> (match con.mems with
     | None    -> Gen.return None
-    | Some _  -> Gen.return (Some (con, as_phrase (Ast.MemoryGrow), [I32Type])))
+    | Some _  -> Gen.return (Some (con, as_phrase Ast.MemoryGrow, [I32Type])))
   | Some _ | None       -> Gen.return None
 
 (**** Control Instructions ****)
 (*** Nop ***)
 (** nop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and nop_gen con t_opt size = match t_opt with
-  | Some t -> Gen.return (Some (con, as_phrase (Ast.Nop), [t]))
-  | None   -> Gen.return (Some (con, as_phrase (Ast.Nop), []))
+  | Some t -> Gen.return (Some (con, as_phrase Ast.Nop, [t]))
+  | None   -> Gen.return (Some (con, as_phrase Ast.Nop, []))
 
 (*** Unreachable ***)
 (** unreachable_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
 and unreachable_gen con t_opt size = match t_opt with
-  | Some t -> Gen.return (Some (con, as_phrase (Ast.Unreachable), [t]))
-  | None   -> Gen.return (Some (con, as_phrase (Ast.Unreachable), []))
+  | Some t -> Gen.return (Some (con, as_phrase Ast.Unreachable, [t]))
+  | None   -> Gen.return (Some (con, as_phrase Ast.Unreachable, []))
+(*FIXME: this "input type" is less general than the specification *)
 
 (*** Block ***)
 (** block_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -558,6 +570,7 @@ and block_gen (con: context_) t_opt size =
     function
       | Some instrs -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, List.rev instrs)), []))
       | None        -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, [])), [])))
+   (*FIXME: on generation failure, an empty block does not leave [t] on the stack *)
 
 (*** Loop ***)
 (** loop_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -570,6 +583,7 @@ and loop_gen (con: context_) t_opt size =
     function
       | Some instrs -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, List.rev instrs)), []))
       | None        -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, [])), [])))
+   (*FIXME: on generation failure, an empty loop body does not leave [t] on the stack? *)
 
 (*** If ***)
 (** if_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -577,7 +591,7 @@ and if_gen (con: context_) t_opt size =
   let ot =  match t_opt with
     | Some t -> [t]
     | None   -> []
-  in
+  in (* FIXME: increase chance of empty else (or then) branch *)
   Gen.(pair (instrs_rule (addLabel (Some I32Type, t_opt) con) ot (size/2))
             (instrs_rule (addLabel (Some I32Type, t_opt) con) ot (size/2)) >>=
       fun (instrs_opt1, instrs_opt2) ->
@@ -601,6 +615,7 @@ and br_gen (con: context_) t_opt size =
            | Some t -> [t]
            | None   -> [] in
          return (Some (con, as_phrase (Ast.Br (as_phrase (Int32.of_int i))), it)))
+(* FIXME: less polymorphic than spec *)
 
 (*** BrIf ***)
 (** brif_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -629,6 +644,7 @@ and brtable_gen (con: context_) t_opt size =
          list (oneofl labels >>= fun (i',it_opt') ->
                return (as_phrase (Int32.of_int i'))) >>= fun ilist ->
          return (Some (con, as_phrase (Ast.BrTable (ilist, (as_phrase (Int32.of_int i)))), I32Type::it)))
+(* FIXME: less polymorphic than spec *)
 
 (*** Return ***)
 (** return_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -637,6 +653,7 @@ and return_gen (con: context_) t_opt size =
     | Some t -> [t]
     | None   -> [] in
   Gen.return (Some (con, as_phrase Ast.Return, tlist))
+(* FIXME: less polymorphic than spec *)
 
 (*** Call ***)
 (** call_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -651,15 +668,14 @@ and call_gen (con: context_) t_opt size =
     | Some TableIndex _  -> [] in
   if ilist = []
   then Gen.return None
-  else
+  else (* FIXME: discourage self call w/weighting, rather than eliminate chance *)
     let ilist' = List.filter (fun (i, tl) -> i <> con.funcindex) ilist in
     if ilist' = []
     then Gen.return None
     else
       Gen.(
         oneofl ilist' >>= fun (i, tl') ->
-          return (Some (con, as_phrase (Ast.Call (as_phrase (Int32.of_int i))), List.rev tl'))
-      )
+          return (Some (con, as_phrase (Ast.Call (as_phrase (Int32.of_int i))), List.rev tl')))
 
 (*** CallIndirect ***)
 (** callindirect_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)
@@ -670,9 +686,8 @@ and callindirect_gen (con: context_) t_opt size =
       let ilist = get_findex t_opt a in
       if ilist = []
       then Gen.return None
-      else Gen.( oneofl ilist >>= fun (idx,i) ->
-        let ftype_opt = get_ftype con i in
-          match ftype_opt with
+      else Gen.(oneofl ilist >>= fun (idx,i) ->
+          match get_ftype con i with
             | None       -> return None
             | Some ftype ->
               return (Some (con,
