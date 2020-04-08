@@ -59,6 +59,8 @@ until it finds a counterexample:
 
 ## Issues Found
 
-* SpiderMonkey: [Crash when start function is added to table](https://bugzilla.mozilla.org/show_bug.cgi?id=1545086)  (new)
+* SpiderMonkey: [Crash when start function is added to table](https://bugzilla.mozilla.org/show_bug.cgi?id=1545086)  (new, fixed)
 * JavaScriptCore: [Wasm engine segmentation fault](https://bugs.webkit.org/show_bug.cgi?id=202786)
+* JavaScriptCore: [Register allocation crash? FATAL: No color for %ftmp0](https://bugs.webkit.org/show_bug.cgi?id=209294)  (known, already fixed)
+* JavaScriptCore: [br_table behavior](https://bugs.webkit.org/show_bug.cgi?id=209333) (new,confirmed)
 * Chakra: [Compile-time rejection of unreachable tee_local](https://github.com/microsoft/ChakraCore/issues/6185)  (known)
