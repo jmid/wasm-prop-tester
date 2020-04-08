@@ -3,14 +3,14 @@ open QCheck
 open Instr_gen
 open Helper
 
-let tmp_dir_name = "tmp";;
+let tmp_dir_name = "tmp"
 
 let tmp_dir = match Sys.file_exists tmp_dir_name with
   | true  -> ()
-  | false -> Unix.mkdir tmp_dir_name 0o775;;
+  | false -> Unix.mkdir tmp_dir_name 0o775
 
-let wat_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wat";;
-let wasm_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wasm";;
+let wat_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wat"
+let wasm_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wasm"
 
 let get_func input ftype body =
   { Ast.ftype  = ftype;
@@ -56,20 +56,9 @@ let context =
 let max_number_args = 10
 let max_number_funs = 10
 
-(** value_type_opt_gen : value_type option **)
-let value_type_opt_gen =
-  Gen.(frequency
-         [ 1, return None;
-           3, map (fun t -> Some t) (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type])
-         ])
-
-(** stack_type_gen : int -> value_type list **)
-let stack_type_gen n =
-  Gen.(list_repeat n (oneofl [Helper.I32Type; Helper.I64Type; Helper.F32Type; Helper.F64Type] ))
-
 (** func_type_gen : func_type **)
 let func_type_gen =
-  Gen.(int_bound max_number_args >>= fun n -> pair (stack_type_gen n) (value_type_opt_gen))
+  Gen.(int_bound max_number_args >>= fun n -> pair (stack_type_gen n) value_type_opt_gen)
 
 (** func_type_list_gen : func_type list **)
 let func_type_list_gen = Gen.(list_size (int_bound max_number_funs) func_type_gen)
@@ -143,7 +132,6 @@ let elems_to_ast_elems el =
            Ast.init = init; })
     el
 
-
 let elem_segment_list_gen m = function
   | None -> Gen.return []
   | Some (l: (Int32.t Types.limits)) ->
@@ -161,19 +149,19 @@ let globals_gen con =
         | t::rst ->
           let t_opt = Some t in
           let rules = [ (1, const_gen con t_opt 1); (*(11, getGlobal_gen con' t_opt 1);*) ] in
-          Instr_gen.generate_rule rules >>= fun instrs_opt ->
+          generate_rule rules >>= fun instrs_opt ->
           match instrs_opt with
           | None -> rec_glob_gen globals rst
           | Some (con'', inst, ts') ->
             oneofl [ Types.Immutable; Types.Mutable; ] >>= fun mutability ->
             rec_glob_gen ((t, mutability, inst)::globals) rst) in
-  Gen.(list (oneofl [I32Type; I64Type; F32Type; F64Type]) >>= rec_glob_gen [])
+  Gen.(list value_type_gen >>= rec_glob_gen [])
 
 let triple_to_global (t,m,inst) =
   as_phrase { Ast.gtype = Types.GlobalType (to_wasm_value_type t, m);
               Ast.value = as_phrase [inst] }
 
-exception Type_not_expected of string;;
+exception Type_not_expected of string
 
 let process_globals con gtypelist =
   let rec rec_glob_process globals glist index =
@@ -275,13 +263,12 @@ let rec rec_func_gen con res func_types index = Gen.(match func_types with
       let func_t = match snd e with
         | Some t -> [t]
         | None   -> [] in
-      Instr_gen.instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt ->
+      instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt ->
       let instrs = match instrs_opt with
         | Some inst -> inst
-        | None      -> [] in
+        | None      -> [] in (*FIXME: failed generation attempt turned into empty list*)
       let func = as_phrase (get_func (to_stack_type (fst e)) (as_phrase (Int32.of_int index)) (List.rev instrs)) in
-      rec_func_gen con (func::res) rst (index + 1)
-  )
+      rec_func_gen con (func::res) rst (index + 1))
 
 let module_gen = Gen.(
   let intypes = [([I32Type], None); ([F32Type], None); ([F64Type], None)] in
@@ -335,359 +322,317 @@ let module_gen = Gen.(
 let module_printer (m : Wasm.Ast.module_' Wasm.Source.phrase) =
   Sexpr.to_string 80 (Arrange.module_ m)
 
-let i32_shrink i =
-  if i = I32.zero then Iter.empty else Iter.return I32.zero
-(*  let c = (I32.div_s i (I32.of_int_s 2)) in
-    if c = i then Iter.empty else Iter.return c *)
+let arb_module = make ~print:module_printer ~shrink:Shrinker.module_shrink module_gen
 
-let i64_shrink i =
-  if i = I64.zero then Iter.empty else Iter.return I64.zero
-(*  let c = (I64.div_s i (I64.of_int_s 2)) in
-    if c = i then Iter.empty else Iter.return c *)
+let iter_exports apply m =
+  let import_len = List.length m.Source.it.Ast.imports in
+  let exports =
+    List.fold_right (fun e acc -> match e.Source.it.Ast.name,e.Source.it.Ast.edesc.Source.it with
+        | name, FuncExport e ->
+          let i = Int32.to_int e.Source.it in
+          let f = List.nth m.Source.it.funcs (i - import_len) in
+          let str = Wasm.Ast.string_of_name name in
+          (name,str,i,f)::acc
+        | _, _ -> acc) m.Source.it.Ast.exports [] in
+  let order = List.sort (fun (_,s,_,_) (_,s',_,_) -> String.compare s s') exports in
+  List.iter (fun (name,str,i,f) -> apply str f) order
 
-let f32_shrink i =
-  if i = F32.zero then Iter.empty else Iter.return F32.zero
+module JSLikeEval =
+struct
+  let tobits = function
+    | '0' -> "0000"
+    | '1' -> "0001"
+    | '2' -> "0010"
+    | '3' -> "0011"
+    | '4' -> "0100"
+    | '5' -> "0101"
+    | '6' -> "0110"
+    | '7' -> "0111"
+    | '8' -> "1000"
+    | '9' -> "1001"
+    | 'a' -> "1010"
+    | 'b' -> "1011"
+    | 'c' -> "1100"
+    | 'd' -> "1101"
+    | 'e' -> "1110"
+    | 'f' -> "1111"
+    |  _  -> failwith "tobits given non hexadecimal char"
 
-let f64_shrink i =
-  if i = F64.zero then Iter.empty else Iter.return F64.zero
+  (* Code adapted from Chet Murthy
+       https://discuss.ocaml.org/t/read-write-floats-in-binary-representation/5044/9 *)
+  (* works for non-negative, non-inf, non-nan f *)
+  let to_string f =
+    (let s = Printf.sprintf "%h" f in
+     let s = String.sub s 2 ((String.length s) - 2) in
+     let mant,exp = match String.split_on_char 'p' s with
+       | [mant;exp] -> mant,exp
+       | _ -> failwith "to_string: Split_on_char 'p' gave <> 2 results" in
+     let exp = int_of_string exp in
+     let mant,morexp = match String.split_on_char '.' mant with
+       | [mant] -> mant,exp
+       | [a;b] -> a^b, exp - 4 * (String.length b)
+       | _ -> failwith "to_string: Split_on_char '.' gave <> 1,2 results" in
+     let tobits_seq c = c |> tobits |> String.to_seq in
+     let mantbits = mant |> String.to_seq |> Seq.flat_map tobits_seq |> String.of_seq in
+     (* adjust for trailing zeros *)
+     let mantbits, morexp = match String.rindex_opt mantbits '1' with
+       | Some onepos when onepos < String.length mantbits - 1
+         -> String.sub mantbits 0 (onepos+1), morexp + (String.length mantbits - (onepos+1))
+       | _ -> mantbits, morexp in
+     let fin =
+       if morexp >= 0
+       then mantbits ^ (String.make morexp '0') (*^ "."*)
+       else
+         let pad_mantbits =
+           let mantlen = String.length mantbits in
+           if mantlen >= -morexp
+           then mantbits
+           else (String.make ((-morexp)-mantlen) '0') ^ mantbits in
+         let padmantlen = String.length pad_mantbits in
+         (if 0 = padmantlen - -morexp
+          then "0."
+          else (String.sub pad_mantbits 0 (padmantlen - -morexp)) ^ ".")
+           ^ (String.sub pad_mantbits (padmantlen - -morexp) (-morexp))
+     in
+     let finlen = String.length fin in
+     let fin = match String.index_opt fin '1', String.index_opt fin '.' with
+       | Some onepos, None ->                             (* strip leading zeros before 1 *)
+         String.sub fin onepos (finlen - onepos)
+       | Some onepos, Some dotpos when onepos < dotpos -> (* strip leading zeros before 1 *)
+         String.sub fin onepos (finlen - onepos)
+       | _, Some dotpos when dotpos > 1 -> (* dotpos < onepos, if present *)
+         String.sub fin (dotpos - 1) (finlen - (dotpos - 1)) (* strip leading zeros before . *)
+       | None, None -> "0"
+       | _ -> fin
+     in fin)
 
-let rec max_global il = match il with
-  | [] -> 0l
-  | (e: Ast.instr)::rst ->
-    match e.it with
-    | Ast.Block (_,l) -> max (max_global rst) (max_global l)
-    | Ast.Loop (_,l)  -> max (max_global rst) (max_global l)
-    | Ast.If (_,l,l') -> max (max_global rst) (max (max_global l) (max_global l'))
-    | Ast.GlobalGet v -> max v.it (max_global rst)
-    | Ast.GlobalSet v -> max v.it (max_global rst)
-    | _               -> max_global rst
+  let f32_to_string f =
+    let x = F32.to_bits f in
+    let is_nan f = F32.ne f f in
+    let abs x = Int32.logand x Int32.max_int in
+    let is_inf x =
+      let pos_inf = Int32.bits_of_float (1.0 /. 0.0) in
+      let neg_inf = Int32.bits_of_float (-. (1.0 /. 0.0)) in
+      x = pos_inf || x = neg_inf in
+    (if F32.lt f F32.zero then "-" else "") ^
+    if is_nan f then "NaN" else
+    if is_inf x then "Infinity" else
+      let x = abs x in (* non-neg, non-inf, non-nan case *)
+      let f = F32.to_float (F32.of_bits x) in
+      to_string f
 
-let rec contains_label is = match is with
-  | [] -> false
-  | i::is ->
-    (match i.Source.it with
-     | Ast.Unreachable
-     | Ast.Nop
-     | Ast.Drop
-     | Ast.Select
-     | Ast.Return
-     | Ast.Call _
-     | Ast.CallIndirect _
-     | Ast.LocalGet _
-     | Ast.LocalSet _
-     | Ast.LocalTee _
-     | Ast.GlobalGet _
-     | Ast.GlobalSet _
-     | Ast.Load _
-     | Ast.Store _
-     | Ast.MemorySize
-     | Ast.MemoryGrow
-     | Ast.Const _
-     | Ast.Test _
-     | Ast.Compare _
-     | Ast.Unary _
-     | Ast.Binary _
-     | Ast.Convert _ -> false
-     | Ast.Block (_,js) -> contains_label js
-     | Ast.Loop (_,js) -> contains_label js
-     | Ast.If (_,is1,is2) -> contains_label is1 || contains_label is2
-     | Ast.Br _ -> true
-     | Ast.BrIf _ -> true
-     | Ast.BrTable (_,_) -> true
-     ) || contains_label is
+  let f64_to_string f =
+    let x = F64.to_bits f in
+    let is_nan f = F64.ne f f in
+    let abs x = Int64.logand x Int64.max_int in
+    let is_inf x =
+      let pos_inf = Int64.bits_of_float (1.0 /. 0.0) in
+      let neg_inf = Int64.bits_of_float (-. (1.0 /. 0.0)) in
+      x = pos_inf || x = neg_inf in
+    (if F64.lt f F64.zero then "-" else "") ^
+    if is_nan f then "NaN" else
+    if is_inf x then "Infinity" else
+      let x = abs x in (* non-neg, non-inf, non-nan case *)
+      let f = F64.to_float (F64.of_bits x) in
+      to_string f
+
+  let i32_to_string i =
+    let s = Printf.sprintf "%x" (abs (Int32.to_int (I32.to_bits i))) in
+    let tobits_seq c = c |> tobits |> String.to_seq in
+    let bits = s |> String.to_seq |> Seq.flat_map tobits_seq |> String.of_seq in
+    (*Printf.printf "in hex: %s in bits: %s\n" s bits;*)
+    let res = match String.index_opt bits '1', String.index_opt bits '0' with
+      | Some onepos, Some zeropos when zeropos < onepos -> (* strip leading zeros before 1 *)
+        String.sub bits onepos (String.length bits - onepos)
+      | None, _ -> "0"
+      | _, _ -> bits in
+    if i < 0l then "-"^res else res
+
+  let print_i32 och vs = match vs with
+    | [Values.I32 i] -> Printf.fprintf och "%s\n" (i32_to_string i); flush och; []
+    | [_] -> failwith (Printf.sprintf "print_i32 called wrong argument type")
+    | _   -> failwith (Printf.sprintf "print_i32 called with %i arguments" (List.length vs))
+
+  let print_f32 och vs = match vs with
+    | [Values.F32 f] -> Printf.fprintf och "%s\n" (f32_to_string f); flush och; []
+    | [_] -> failwith (Printf.sprintf "print_f32 called wrong argument type")
+    | _   -> failwith (Printf.sprintf "print_f32 called with %i arguments" (List.length vs))
+
+  let print_f64 och vs = match vs with
+    | [Values.F64 f] -> Printf.fprintf och "%s\n" (f64_to_string f); flush och; []
+    | [_] -> failwith (Printf.sprintf "print_f64 called wrong argument type")
+    | _   -> failwith (Printf.sprintf "print_f64 called with %i arguments" (List.length vs))
+
+  let print och vs = match vs with
+    | [Values.I32 i] -> Printf.fprintf och "%s\n" (i32_to_string i); flush och; []
+    | [Values.F32 f] -> Printf.fprintf och "%s\n" (f32_to_string f); flush och; []
+    | [Values.F64 f] -> Printf.fprintf och "%s\n" (f64_to_string f); flush och; []
+    | [_] -> failwith (Printf.sprintf "print called wrong argument type")
+    | _   -> failwith (Printf.sprintf "print called with %i arguments" (List.length vs))
+
+  let lookup och name t =
+    match Utf8.encode name, t with
+    | "log",   Types.(ExternFuncType (FuncType ([I32Type],[]))) ->
+      Instance.ExternFunc (Func.alloc_host (Types.FuncType ([I32Type],[])) (print_i32 och))
+    | "logfl", Types.(ExternFuncType (FuncType ([F32Type],[]))) ->
+      Instance.ExternFunc (Func.alloc_host (Types.FuncType ([F32Type],[])) (print_f32 och))
+    | "logfl", Types.(ExternFuncType (FuncType ([F64Type],[]))) ->
+      Instance.ExternFunc (Func.alloc_host (Types.FuncType ([F64Type],[])) (print_f64 och))
+    | _ -> raise Not_found
+
+  let inst_run_mod och m =
+    Import.register (Utf8.decode "imports") (lookup och);
+    let protected_run f =
+      try f () with
+      | Eval.Trap (_,"integer divide by zero") ->
+        Printf.fprintf och "RuntimeError integer division by zero\n"; flush_all ()
+
+      | Eval.Trap (_,"unreachable executed") ->
+        Printf.fprintf och "RuntimeError unreachable executed\n"; flush_all ()
+
+      | Eval.Exhaustion (_,"call stack exhausted") ->
+        Printf.fprintf och "stack overflow\n"; flush_all ()
+
+      | Eval.Trap (_,"integer overflow")
+      | Eval.Trap (_,"invalid conversion to integer") ->
+        Printf.fprintf och "RuntimeError invalid conversion to integer or overflow\n"; flush_all ()
+      | Eval.Trap (_,"out of bounds memory access") ->
+        Printf.fprintf och "RuntimeError out of bounds memory access\n"; flush_all ()
   
-let rec instr_list_shrink gs is = match is with
-  | [] -> Iter.empty
-  | i::is ->
-    Iter.(
-      (match is with
-       | [] -> Iter.empty
-       | j::is ->
-         (match is with
-          | [] -> empty
-          | k::is ->
-            (match i.Source.it,j.Source.it,k.Source.it with
-             | Ast.Const _    , Ast.Const _    , Ast.Select
-             | Ast.Const _    , Ast.LocalGet _ , Ast.Select
-             | Ast.Const _    , Ast.GlobalGet _, Ast.Select
-             | Ast.LocalGet _ , Ast.Const _    , Ast.Select
-             | Ast.LocalGet _ , Ast.LocalGet _ , Ast.Select
-             | Ast.LocalGet _ , Ast.GlobalGet _, Ast.Select
-             | Ast.GlobalGet _, Ast.Const _    , Ast.Select
-             | Ast.GlobalGet _, Ast.LocalGet _ , Ast.Select
-             | Ast.GlobalGet _, Ast.GlobalGet _, Ast.Select -> return is
-             | Ast.Const _    , Ast.Const _    , Ast.Compare _
-             | Ast.Const _    , Ast.LocalGet _ , Ast.Compare _
-             | Ast.Const _    , Ast.GlobalGet _, Ast.Compare _
-             | Ast.LocalGet _ , Ast.Const _    , Ast.Compare _
-             | Ast.LocalGet _ , Ast.LocalGet _ , Ast.Compare _
-             | Ast.LocalGet _ , Ast.GlobalGet _, Ast.Compare _
-             | Ast.GlobalGet _, Ast.Const _    , Ast.Compare _
-             | Ast.GlobalGet _, Ast.LocalGet _ , Ast.Compare _
-             | Ast.GlobalGet _, Ast.GlobalGet _, Ast.Compare _ ->
-               return ((as_phrase (Ast.Const (as_phrase (Values.I32 I32.zero))))::is)
-             | _, _, _ -> empty))
-         <+>
-         (match i.Source.it,j.Source.it with
-           | Ast.Const _    , Ast.BrIf _
-           | Ast.LocalGet _ , Ast.BrIf _
-           | Ast.GlobalGet _, Ast.BrIf _
-           | Ast.Const _    , Ast.Drop
-           | Ast.LocalGet _ , Ast.Drop
-           | Ast.GlobalGet _, Ast.Drop
-           | Ast.Const _    , Ast.Binary _
-           | Ast.LocalGet _ , Ast.Binary _
-           | Ast.GlobalGet _, Ast.Binary _
-           | Ast.Const _, Ast.LocalSet _
-           | Ast.Const _, Ast.GlobalSet _
-           | Ast.GlobalGet _, Ast.GlobalSet _
-           | Ast.LocalGet _ , Ast.LocalSet _
-           | Ast.GlobalGet _, Ast.LocalSet _
-           | Ast.LocalGet _ , Ast.GlobalSet _ -> return is
-           | Ast.Const _    , Ast.Test _
-           | Ast.LocalGet _ , Ast.Test _
-           | Ast.GlobalGet _, Ast.Test _ ->
-             return ((as_phrase (Ast.Const (as_phrase (Values.I32 I32.zero))))::is)
-           | Ast.Const _    , Ast.If (_,is1,is2)
-           | Ast.LocalGet _ , Ast.If (_,is1,is2)
-           | Ast.GlobalGet _, Ast.If (_,is1,is2) ->
-             (if contains_label is1 then empty else return (is1@is))
-             <+>
-             (if contains_label is2 then empty else return (is2@is))
-           | _, _ -> empty))
-      <+>
-      (match i.Source.it with
-       | Ast.Nop
-       | Ast.LocalTee _
-       | Ast.MemoryGrow
-       | Ast.Unary _    -> return is         (* no change in stack -> omit *)
-       | Ast.GlobalSet g ->                  (* change GlobalSets into Drop *)
-         return ((as_phrase Ast.Drop)::is)
-         <+> (* or replace GlobalSet with another, lower-indexed one *)
-         (let glob = List.nth gs (Int32.to_int g.it) in
-          let gtype = glob.Source.it.Ast.gtype in
-          let i = find_global_index (fun g -> gtype = g.Source.it.Ast.gtype) gs in
-          if i < (Int32.to_int g.it)
-          then return (as_phrase (Ast.GlobalSet (as_phrase (I32.of_int_s i)))::is)
-          else empty)
-       | Ast.GlobalGet g ->                  (* change GlobalGets into Consts *)
-         let glob = List.nth gs (Int32.to_int g.it) in
-         (let zero = (match glob.Source.it.Ast.gtype with
-              | GlobalType (I32Type,_) -> Values.I32 I32.zero
-              | GlobalType (I64Type,_) -> Values.I64 I64.zero
-              | GlobalType (F32Type,_) -> Values.F32 F32.zero
-              | GlobalType (F64Type,_) -> Values.F64 F64.zero) in
-          return ((as_phrase (Ast.Const (as_phrase zero)))::is))
-         <+> (* or replace GlobalGet with another, lower-indexed one *)
-         (let Wasm.Types.GlobalType (vtype,_) = glob.Source.it.Ast.gtype in
-          let i = find_global_index
-                    (fun g -> let Wasm.Types.GlobalType (vtype',_) = g.Source.it.Ast.gtype in
-                              vtype = vtype') gs in
-          if i < (Int32.to_int g.it)
-          then return (as_phrase (Ast.GlobalGet (as_phrase (I32.of_int_s i)))::is)
-          else empty)
-       | Ast.Return ->
-         if is=[] then empty else return [i] (* delete instrs after return *)
-       | Ast.Block (sts,[])  -> return is    (* remove empty block *)
-       | Ast.Block (sts,is') ->
-         map (fun is'' -> as_phrase (Ast.Block (sts,is''))::is) (instr_list_shrink gs is')
-       | Ast.Loop (sts,is') ->
-         (match sts with
-          | []  -> return is
-          | [t] ->
-            let zero = (match t with
-              | I32Type -> Values.I32 I32.zero
-              | I64Type -> Values.I64 I64.zero
-              | F32Type -> Values.F32 F32.zero
-              | F64Type -> Values.F64 F64.zero) in
-            return (as_phrase (Ast.Const (as_phrase zero))::is)
-          | _ -> empty)
-         <+>
-         (if contains_label is' then empty else return (is'@is))
-         <+>
-         map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink gs is')
-       | Ast.If (sts,is1,is2) ->
-         (if contains_label is1 then empty else return ((as_phrase Ast.Drop)::is1@is))
-         <+>
-         (if contains_label is2 then empty else return ((as_phrase Ast.Drop)::is2@is))
-         <+>
-         (map (fun is' -> as_phrase (Ast.If (sts,is',is2))::is) (instr_list_shrink gs is1))
-         <+>
-         (map (fun is' -> as_phrase (Ast.If (sts,is1,is'))::is) (instr_list_shrink gs is2))
-       | Ast.BrTable (vs,v) ->
-         map (fun vs' -> as_phrase (Ast.BrTable (vs',v))::is) (Shrink.list vs)
-       | Ast.Const l -> (match l.Source.it with
-           | Values.I32 i ->
-             map (fun j -> as_phrase (Ast.Const (as_phrase (Values.I32 j)))::is) (i32_shrink i)
-           | Values.I64 i ->
-             map (fun j -> as_phrase (Ast.Const (as_phrase (Values.I64 j)))::is) (i64_shrink i)
-           | Values.F32 f ->
-             map (fun g -> as_phrase (Ast.Const (as_phrase (Values.F32 g)))::is) (f32_shrink f)
-           | Values.F64 f ->
-             map (fun g -> as_phrase (Ast.Const (as_phrase (Values.F64 g)))::is) (f64_shrink f)
-         )
-       | _ -> empty)
-      <+>
-      map (fun is' -> i::is') (instr_list_shrink gs is)
-    )
+      | Eval.Trap (_,"indirect call type mismatch") ->
+        Printf.fprintf och "RuntimeError indirect call error\n"; flush_all ()
+  
+      | Eval.Trap (_,err) ->
+        if String.length err > 21 && String.sub err 0 21 = "uninitialized element"
+        then (Printf.fprintf och "RuntimeError indirect call error\n"; flush_all ())
+        else Printf.fprintf och "Trap exception: %s\n" err; flush_all ()
 
-let global_shrink gs g =
-  let g' = g.Source.it in
-  Iter.map
-    (fun is -> as_phrase { g' with Ast.value = as_phrase is })
-    (instr_list_shrink gs g'.Ast.value.Source.it)
-(*
-  let { Ast.gtype : Wasm.Types.global_type; Ast.value : const; } = g' in
-  match List.find_opt (fun g -> g.Source.it.Ast.gtype ) gs with
-  | None -> Iter.empty
-  | Some g'' ->
+      | Eval.Exhaustion (_,err) ->
+        Printf.fprintf och "Exhaustion exception: %s\n" err; flush_all ()
 
-    get_global_indexes g'.Ast.gtype 
-*)
+      | Eval.Link (_,"data segment does not fit memory") ->
+        Printf.fprintf och "LinkError data segment does not fit memory\n" ; flush_all () 
 
-let split n xs =
-  let rec walk n xs ys = match n,ys with
-    | 0,_     -> List.rev xs, ys
-    | _,[]    -> List.rev xs, ys
-    | _,y::ys -> walk (n-1) (y::xs) ys in
-  walk n [] xs
+        (*    | _ (*Wasm.Error.Make.Error (_,err)*) ->
+              Printf.fprintf och "other exception\n"; flush_all () (*true*)(*false*) *)in
 
-(* a size-preserving list-shrinker *)
-(*
-let rec shrink_list_elements ~shrink xs = match xs with
-  | [] -> Iter.empty
-  | x::xs ->
-    Iter.(
-      map (fun x' -> x'::xs) (shrink x)
-      <+>
-      map (fun xs -> x::xs) (shrink_list_elements ~shrink xs))
-*)
+    protected_run
+      (fun () ->
+         let inst = ref (Eval.init m (Import.link m)) in
+         iter_exports
+           (fun str f ->
+              protected_run
+                (fun () ->
+                   let typ =
+                     List.nth m.Source.it.types (Int32.to_int f.Source.it.Ast.ftype.Source.it) in
+                   Printf.fprintf och "%s\n" str;
+                   flush och;
+                   ignore (print och (Eval.invoke (AstFunc (typ.Source.it, inst, f)) [])))) m)
 
-let rec shrink_functions gs (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
-  match fs with
-  | [] -> Iter.empty
-  | f::fs ->
-    Iter.(
-      (match f.it.Ast.body with
-         | []  -> empty (* don't shrink empty body *)
-         | [i] -> empty (* or one instr body *)
-         | _  ->
-           map
-             (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
-             ((let var = f.it.ftype.it in
-              let typ = List.nth types (Int32.to_int var) in
-              match typ.Source.it with
-              | Types.FuncType ([],[]) ->  return []
-              | Types.FuncType (_,[rt]) ->
-                let last = match rt with
-                    | I32Type -> Values.I32 I32.zero
-                    | I64Type -> Values.I64 I64.zero
-                    | F32Type -> Values.F32 F32.zero
-                    | F64Type -> Values.F64 F64.zero in
-                return [as_phrase (Ast.Const (as_phrase last))]
-              | _ -> empty)))
-      <+>
-      (map
-         (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
-         (instr_list_shrink gs f.Source.it.Ast.body))
-      <+>
-      map (fun fs' -> f::fs') (shrink_functions gs fs types))
+  let run_module och m =
+    try inst_run_mod och m; true with
+    | Eval.Link (_,err) ->
+      Printf.fprintf och "Link exception: %s\n" err; flush_all (); false
+    | Eval.Crash (_,err) ->
+      Printf.fprintf och "Crash exception: %s\n" err; flush_all (); false
+  (* | Failure err ->
+       Printf.fprintf och "Failure exception: %s\n" err; flush_all (); false *)
+  (* | _ -> false *)
+end
 
-let shrink_data s =
-  Iter.map (fun s' -> as_phrase {s.Source.it with Ast.init = s'})
-     (Shrink.string s.Source.it.Ast.init)
+type result = Timeout | Res of bool
 
-let module_valid m = try Valid.check_module m; true with Valid.Invalid (_,_) -> false
-
-let module_shrink (m : Wasm.Ast.module_' Wasm.Source.phrase) =
-  Iter.((* shrink funcs and types combined *)
-        (try (* 3 imports, start, 3 exports *)
-          let fixed_ts,rest_ts = split 7 m.it.Ast.types in
-          let fixed_fs,rest_fs = split 4 m.it.Ast.funcs in
-          let rest = List.combine rest_ts rest_fs in
-          filter module_valid
-            (map
-               (fun rest' ->
-                  let rest_ts,rest_fs = List.split rest' in
-                  as_phrase { m.it with Ast.types = fixed_ts@rest_ts;
-                                        Ast.funcs = fixed_fs@rest_fs })
-               (Shrink.list rest))
-        with Invalid_argument _ -> Iter.empty)
-        <+>
-        map (* shrink func bodies *)
-          (fun funs' -> as_phrase { m.it with Ast.funcs = funs' })
-          (shrink_functions m.it.Ast.globals m.it.Ast.funcs m.it.Ast.types)
-        <+> (* remove unneeded funcs *)
-        (let fixed,rest = split 4 m.it.Ast.funcs in (* start +3 exports, 3 imports not counted *)
-         filter module_valid
-           (map
-              (fun rest' -> as_phrase { m.it with Ast.funcs = fixed@rest' })
-              (Shrink.list rest)))
-        <+> (* shrink data segment *)
-        map (fun ds -> as_phrase { m.it with Ast.data = ds })
-          (Shrink.list ~shrink:shrink_data m.it.Ast.data)
-        <+> (* remove start *)
-        (match m.it.Ast.start with
-         | None   -> empty
-         | Some _ -> return (as_phrase { m.it with Ast.start = None }))
-        <+> (* reduce globals *)
-        filter module_valid
-          (map (fun gs -> as_phrase { m.it with Ast.globals = gs })
-             (Shrink.list ~shrink:(global_shrink m.it.Ast.globals) m.it.Ast.globals))
-        <+> (* reduce declared types *)
-        filter module_valid
-          (map (fun ts -> as_phrase { m.it with Ast.types = ts }) (Shrink.list m.it.Ast.types))
-        <+> (* reduce tables *)
-        filter module_valid
-          (map (fun tbs -> as_phrase { m.it with Ast.tables = tbs }) (Shrink.list m.it.Ast.tables))
-        <+> (* reduce memories *)
-        filter module_valid
-          (map (fun ms -> as_phrase { m.it with Ast.memories = ms }) (Shrink.list m.it.Ast.memories))
-        <+> (* shrink elems *)
-        filter module_valid
-          (map (fun es -> as_phrase { m.it with Ast.elems = es }) (Shrink.list m.it.Ast.elems)))
-
-let arb_module = make ~print:module_printer ~shrink:module_shrink module_gen
-
-let host_debug vs = match vs with
-  | [v] -> Printf.printf "%s\n" (Values.string_of_value v); []
-  | _ -> failwith (Printf.sprintf "host_debug called with %i arguments" (List.length vs))
-
-let lookup name t =
-(*  Printf.printf "lookup: %s\n" (Utf8.encode name);
-    flush_all ();*)
-  match Utf8.encode name, t with
-  | "log",   Types.(ExternFuncType (FuncType ([I32Type],[]))) ->
-    Instance.ExternFunc (Func.alloc_host (Types.FuncType ([I32Type],[])) host_debug)
-  | "logfl", Types.(ExternFuncType (FuncType ([F32Type],[]))) ->
-    Instance.ExternFunc (Func.alloc_host (Types.FuncType ([F32Type],[])) host_debug)
-  | "logfl", Types.(ExternFuncType (FuncType ([F64Type],[]))) ->
-    Instance.ExternFunc (Func.alloc_host (Types.FuncType ([F64Type],[])) host_debug)
-  | _ -> raise Not_found
+let timed_fork_prop sec p x cleanup =
+  let a = Unix.fork() in match a with
+  | 0  ->
+    let _ = Unix.alarm sec in
+    if p x
+    then (ignore (Unix.alarm 0); exit 0) (*cancel alarm*)
+    else (ignore (Unix.alarm 0); exit 2) (*cancel alarm*)
+  (* | -1 -> print_endline "error accured on fork"; false *)
+  | _  ->
+    let childid, retcode = Unix.wait () in
+    let _code, _s, res = (match retcode with
+        | WEXITED code   -> code, "WEXITED", Res (0=code)
+        | WSIGNALED code -> code, "WSIGNALED", if Sys.sigalrm=code then Timeout else Res false
+        | WSTOPPED code  -> code, "WSTOPPED", Res false) in
+    cleanup(); res
 
 let run_int_test =
-  Test.make ~name:"ref interpret internal run" ~count:1(*00*)
+  Test.make ~name:"ref interpret internal run" ~count:10(*00*)
     ((*set_shrink Shrink.nil*) arb_module)
     (function m ->
-       try
-         Import.register (Utf8.decode "imports") lookup;
-         let inst = ref (Eval.init m (Import.link m)) in
-         let invoke n typ =
-           Eval.invoke (AstFunc (typ, inst, List.nth m.Source.it.Ast.funcs n)) [] in
-         ignore(host_debug (invoke 4 (Types.FuncType ([],[I32Type]))));
-         ignore(host_debug (invoke 5 (Types.FuncType ([],[F32Type]))));
-         ignore(host_debug (invoke 6 (Types.FuncType ([],[F64Type]))));
-         true
-       with Eval.Link (_,err) ->
-            Printf.printf "Link exception: %s\n" err; flush_all (); false
-          | Eval.Trap (_,err) ->
-            Printf.printf "Trap exception: %s\n" err; flush_all (); false
-          | Eval.Crash (_,err) ->
-            Printf.printf "Crash exception: %s\n" err; flush_all (); false
-          | Eval.Exhaustion (_,err) ->
-            Printf.printf "Exhaustion exception: %s\n" err; flush_all (); false
-          (* | _ -> false *)
-    )
+       let och = open_out "tmp/tmp_spec" in
+       match timed_fork_prop 10 (JSLikeEval.run_module och) m (fun () -> flush och; close_out och) with
+       | Timeout -> false
+       | Res res -> res)
+
+let count = ref 0
+
+
+let convert file_name eng =
+  let cmd =
+    Printf.sprintf
+      "node ../javascript/convert.js %s %s > tmp/tmp_%s.js 2> tmp/error" file_name eng eng in
+  Sys.command cmd
+
+let run eng =
+  let cmd =
+    Printf.sprintf "timeout 10 %s tmp/tmp_%s.js > tmp/tmp_%s 2>&1" eng eng eng in
+  Sys.command cmd
+
+let timeout = 124
+let okish code = code = 0 || code = timeout
+
+let ch_tee_local_bug fname =
+  0 = Sys.command ("grep -q 'tee_local' " ^ fname)
+
+let run_diff_from_ocaml =
+  Test.make ~name:"ref interpret vs. v8" ~count:100(*00*)
+    (arb_module)
+    (function m ->
+       module_to_wasm m wasm_file_name;
+       module_to_wat m wat_file_name;
+       let v8res  = convert wasm_file_name "v8" in
+       let smres  = convert wasm_file_name "sm" in
+       let chres  = convert wasm_file_name "ch" in
+       let jscres = convert wasm_file_name "jsc" in
+       let res = 0 = v8res && 0 = smres && 0 = chres && 0 = jscres in
+       let v8rc  = run "v8" in
+       let smrc  = run "sm" in
+       let chrc  = run "ch" in
+       let jscrc = run "jsc" in
+       let res = res && okish v8rc && v8rc = smrc && smrc = chrc && chrc = jscrc in
+       let och = open_out "tmp/tmp_spec" in
+       let spec_res =
+         timed_fork_prop 10 (JSLikeEval.run_module och) m (fun () -> flush och; close_out och) in
+       let res = res && (match spec_res with | Timeout -> v8rc = timeout | Res res -> res) in
+       let res = res &&
+          (if ch_tee_local_bug "tmp/tmp_ch"
+           then true
+           else 0 = Sys.command "cmp -s -n 5000 tmp/tmp_ch  tmp/tmp_jsc") &&
+          0 = Sys.command "cmp -s -n 5000 tmp/tmp_jsc tmp/tmp_sm" &&
+          0 = Sys.command "cmp -s -n 5000 tmp/tmp_sm  tmp/tmp_v8" &&
+          0 = Sys.command "cmp -s -n 300  tmp/tmp_v8 tmp/tmp_spec" in
+       if not res
+       then
+         begin
+           ignore (Sys.command ("cp -f " ^ wat_file_name ^ " tmp/prev.wat"));
+           ignore (Sys.command ("cp -f " ^ wasm_file_name ^ " tmp/prev.wasm"));
+           ignore (Sys.command ("cp -f tmp/tmp_v8.js tmp/prev_v8.js"));
+           ignore (Sys.command ("cp -f tmp/tmp_sm.js tmp/prev_sm.js"));
+           ignore (Sys.command ("cp -f tmp/tmp_ch.js tmp/prev_ch.js"));
+           ignore (Sys.command ("cp -f tmp/tmp_jsc.js tmp/prev_jsc.js"));
+           ignore (Sys.command ("cp -f tmp/tmp_v8 tmp/prev_v8"));
+           ignore (Sys.command ("cp -f tmp/tmp_sm tmp/prev_sm"));
+           ignore (Sys.command ("cp -f tmp/tmp_ch tmp/prev_ch"));
+           ignore (Sys.command ("cp -f tmp/tmp_jsc tmp/prev_jsc"));
+           ignore (Sys.command ("cp -f tmp/tmp_spec tmp/prev_spec"));
+	   ignore (Sys.command ("cp -f tmp/error tmp/prev_error"));
+           incr count;
+           module_to_wat m ("tmp/shrink" ^ (string_of_int !count) ^ ".wat")
+         end;
+       res)
 
 let run_ext_test =
   Test.make ~name:"ref interpret external run" ~count:1(*00*)
