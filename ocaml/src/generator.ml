@@ -250,11 +250,9 @@ let context_with_ftype con funcindex =
   let label = [snd ftype, snd ftype] in (* Q: Why snd ftype twice? *)
   { con with 
     labels = label;
-    locals = fst ftype;
+    locals = fst ftype;  (* FIXME: only params, not an arbitrary number of locals *)
     return = snd ftype;
     funcindex = funcindex }
-
-let extend_context con data' = { con with data = data'; }
 
 (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
 let rec rec_func_gen con res func_types index = Gen.(match func_types with
@@ -277,12 +275,12 @@ let module_gen = Gen.(
   oneofl [ None; Some (as_phrase 3l);] >>= fun start ->
   context_gen >>= fun context ->
   triple
-    (globals_gen context) (func_type_list_gen) (data_segment_list_gen context.mems) >>= 
+    (globals_gen context) func_type_list_gen (data_segment_list_gen context.mems) >>=
         fun (gltypelist, ftypelist, ds) ->
-          (elem_segment_list_gen ((List.length ftypelist) + 7) context.tables) >>= 
+          elem_segment_list_gen (List.length ftypelist + 7) context.tables >>=
           fun es ->
 
-          let con = extend_context context ds in
+          let con = { context with data = ds } in
           let con = process_globals con gltypelist in
           let con = process_funcs con ftypelist 7 in
           let con = process_elems con es in
@@ -588,7 +586,7 @@ let ch_tee_local_bug fname =
   0 = Sys.command ("grep -q 'tee_local' " ^ fname)
 
 let run_diff_from_ocaml =
-  Test.make ~name:"ref interpret vs. v8" ~count:100(*00*)
+  Test.make ~name:"ref interpret vs. js-engines" ~count:100(*00*)
     (arb_module)
     (function m ->
        module_to_wasm m wasm_file_name;
