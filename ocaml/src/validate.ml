@@ -44,7 +44,7 @@ QCheck_runner.run_tests_main
   [ output_validates;
     output_wabt_validates_int_conv;
     output_wabt_validates_ext_conv;
-    output_wabt_validates_with "ch";
+    (*  output_wabt_validates_with "ch"; *)
     output_wabt_validates_with "v8"; 
     output_wabt_validates_with "sm"; 
     output_wabt_validates_with "jsc";

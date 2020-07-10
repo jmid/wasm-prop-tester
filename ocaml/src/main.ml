@@ -17,8 +17,8 @@ let compare_engines_test =
 
 QCheck_runner.run_tests_main
   [
+    run_diff_from_ocaml;
     (*compare_engines_test;*)
     (*run_int_test;*)
-    run_diff_from_ocaml;
     (*    run_ext_test;*)
     (*implementation_test;*) (*implementation_stat_test;*) (*conversion_test; wabt_test;*) ] ;;
