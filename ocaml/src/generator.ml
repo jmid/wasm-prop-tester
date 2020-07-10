@@ -100,8 +100,10 @@ let limits_to_ast_table = function
     let table = { Ast.ttype = Types.TableType (l, Types.FuncRefType(*Types.AnyFuncType*)) } in
     [as_phrase table]
 
+let types_value_type_gen = Gen.oneofl [Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type]
+
 let data_segment_gen n = Gen.(
-  oneofl [ Types.I32Type; Types.I64Type; Types.F32Type; Types.F64Type ] >>= fun t ->
+   types_value_type_gen >>= fun t ->
     let size = Types.size t in
     pair string (int_bound (n - size)) >>= fun (s, i) ->
     return (as_phrase
@@ -242,12 +244,8 @@ let process_elems (con: context_) el =
   let elems' = Array.make size None in
   { con with elems = Some (set_up elems' el); }
 
-let context_with_ftype con funcindex =
-  (* let ftype = List.nth con.funcs funcindex *)
-  let ftype = match get_ftype con funcindex with
-    | Some e -> e
-    | _      -> raise (Type_not_expected (string_of_int funcindex)) in
-  let label = [snd ftype, snd ftype] in (* Q: Why snd ftype twice? *)
+let context_with_ftype con ftype funcindex =
+  let label = [snd ftype, snd ftype] in (* Q: Why snd ftype pair? *)
   { con with 
     labels = label;
     locals = fst ftype;  (* FIXME: only params, not an arbitrary number of locals *)
@@ -261,7 +259,7 @@ let rec rec_func_gen con res func_types index = Gen.(match func_types with
       let func_t = match snd e with
         | Some t -> [t]
         | None   -> [] in
-      instr_gen (context_with_ftype con index) (fst e, func_t) >>= fun instrs_opt ->
+      instr_gen (context_with_ftype con e index) (fst e, func_t) >>= fun instrs_opt ->
       let instrs = match instrs_opt with
         | Some inst -> inst
         | None      -> [] in (*FIXME: failed generation attempt turned into empty list*)
