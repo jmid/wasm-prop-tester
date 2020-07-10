@@ -51,7 +51,7 @@ let f64_gen =
                    3, map F64.of_float float;
                    5, map F64.of_bits ui64; ])
 
-(** value_type_gen : value_type Gen.t **)
+(** value_type_gen : Helper.value_type Gen.t **)
 let value_type_gen = Gen.oneofl [I32Type; I64Type; F32Type; F64Type]
 
 (** value_type_opt_gen : value_type option Gen.t **)
@@ -694,7 +694,7 @@ and callindirect_gen (con: context_) t_opt size =
                             as_phrase (Ast.CallIndirect (as_phrase (Int32.of_int i))),
                             (TableIndex idx)::(List.rev (fst ftype)))))
 
-let instr_gen context types = Gen.sized (instrs_rule context (snd types))
+let instr_gen context goal_types = Gen.sized (instrs_rule context goal_types)
   (* Gen.(sized_size (int_bound 500) (fun n ->
     instrs_rule context (snd types) n >>= fun instrs -> return instrs)) *)
   (* Gen.(sized_size (int_bound 1000) (fun n ->
