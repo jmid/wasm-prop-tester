@@ -256,10 +256,10 @@ let context_with_ftype con ftype funcindex =
 let rec rec_func_gen con res func_types index = Gen.(match func_types with
     | []     -> return res
     | e::rst ->
-      let func_t = match snd e with
+      let res_type = match snd e with
         | Some t -> [t]
         | None   -> [] in
-      instr_gen (context_with_ftype con e index) (fst e, func_t) >>= fun instrs_opt ->
+      instr_gen (context_with_ftype con e index) (fst e, res_type) >>= fun instrs_opt ->
       let instrs = match instrs_opt with
         | Some inst -> inst
         | None      -> [] in (*FIXME: failed generation attempt turned into empty list*)
