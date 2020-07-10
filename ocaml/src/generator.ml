@@ -12,9 +12,9 @@ let tmp_dir = match Sys.file_exists tmp_dir_name with
 let wat_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wat"
 let wasm_file_name = tmp_dir_name ^ "/" ^ "tmp_module.wasm"
 
-let get_func input ftype body =
+let get_func ftype locals body =
   { Ast.ftype  = ftype;
-    Ast.locals = input;
+    Ast.locals = locals;
     Ast.body   = body; }
 
 let module_to_wat m file =
@@ -63,7 +63,7 @@ let func_type_gen =
 (** func_type_list_gen : func_type list **)
 let func_type_list_gen = Gen.(list_size (int_bound max_number_funs) func_type_gen)
 
-let process_funcs con flist index = 
+let process_funcs con flist index =
   let rec process_flist funcs i = function
     | []      -> funcs
     | e::rst  -> 
@@ -244,26 +244,28 @@ let process_elems (con: context_) el =
   let elems' = Array.make size None in
   { con with elems = Some (set_up elems' el); }
 
-let context_with_ftype con ftype funcindex =
-  let label = [snd ftype, snd ftype] in (* Q: Why snd ftype pair? *)
-  { con with 
+let function_context con params res_type funcindex locals =
+  let label = [res_type, res_type] in (* Q: Why res_type pair? *)
+  { con with
     labels = label;
-    locals = fst ftype;  (* FIXME: only params, not an arbitrary number of locals *)
-    return = snd ftype;
+    locals = params@locals;
+    return = res_type;
     funcindex = funcindex }
 
 (* rec_func_gen : (Types.stack_type * Types.stack_type) list -> ((instr list) option) list Gen.t *)
 let rec rec_func_gen con res func_types index = Gen.(match func_types with
     | []     -> return res
-    | e::rst ->
-      let res_type = match snd e with
+    | ft::rst ->
+      let params,res_type = ft in
+      small_list value_type_gen >>= fun locals ->  (* arbitrary small_lists of locals *)
+      let goal_type = match res_type with
         | Some t -> [t]
         | None   -> [] in
-      instr_gen (context_with_ftype con e index) (fst e, res_type) >>= fun instrs_opt ->
+      instr_gen (function_context con params res_type index locals) goal_type >>= fun instrs_opt ->
       let instrs = match instrs_opt with
         | Some inst -> inst
-        | None      -> [] in (*FIXME: failed generation attempt turned into empty list*)
-      let func = as_phrase (get_func (to_stack_type (fst e)) (as_phrase (Int32.of_int index)) (List.rev instrs)) in
+        | None      -> failwith "body generation failed" in
+      let func = as_phrase (get_func (as_phrase (Int32.of_int index)) (to_stack_type locals) (List.rev instrs)) in
       rec_func_gen con (func::res) rst (index + 1))
 
 let module_gen = Gen.(
@@ -660,7 +662,7 @@ let float_test =
     let m = as_phrase
       { Ast.empty_module with
         Ast.types = func_type_list_to_type_phrase ([([], Some (F32Type))]);
-        Ast.funcs = [as_phrase (get_func [] (as_phrase 0l)
+        Ast.funcs = [as_phrase (get_func (as_phrase 0l) []
                                   [as_phrase (Ast.Const (as_phrase (Values.F32 (F32.of_float 1.62315690127))))])]} in
     module_to_wat m wat_file_name;
     Sys.command ("../script/compare_engines.sh " ^ wat_file_name) = 0)
@@ -675,7 +677,7 @@ let buffer_test =
       { Ast.empty_module with
         Ast.types = func_type_list_to_type_phrase [([I32Type], None); ([I32Type], None); ([], Some I32Type)];
         Ast.funcs =
-          [as_phrase (get_func [] (as_phrase 1l) [
+          [as_phrase (get_func (as_phrase 1l) [] [
                as_phrase (Ast.LocalGet (as_phrase 0l));
                as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i))));
                as_phrase (Ast.Compare (Values.I32 (Ast.IntOp.Eq)));
@@ -687,7 +689,7 @@ let buffer_test =
                                    as_phrase (Ast.Const (as_phrase (Values.I32 1l)));
                                    as_phrase (Ast.Binary (Values.I32 Ast.IntOp.Add));
                                    as_phrase (Ast.Call (as_phrase 1l)) ]))]);
-           as_phrase (get_func [] (as_phrase 2l) [
+           as_phrase (get_func (as_phrase 2l) [] [
                as_phrase (Ast.Const (as_phrase (Values.I32 1l)));
                as_phrase (Ast.Call (as_phrase 1l));
                as_phrase (Ast.Loop ([Types.I32Type], [
