@@ -1,4 +1,4 @@
-# WebAssembly Property-Based Testing
+# Property-Based Testing of WebAssembly 
 
 This project implements a generator of arbitrary WebAssembly programs
 described in the paper
@@ -9,7 +9,9 @@ described in the paper
 
 We run each generated WebAssembly (Wasm) program on the engines underlying Chrome, Firefox, Safari, and Edge
 and on the [WebAssembly reference interpreter](https://github.com/WebAssembly/spec) 
-and compare their output to help ensure consistent behaviour.
+and compare their output to help ensure consistent behaviour. The generator is stack-directed
+to produce programs that will pass validation ("are type correct"). A custom stack-directed shrinker
+reduces the often large random counterexample programs, without breaking validation.
 
 Surprisingly this black-box generator approach found 2 crashing bugs,
 despite browser vendor efforts to fuzz test the engines with
