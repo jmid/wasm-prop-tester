@@ -1,16 +1,25 @@
 # WebAssembly Property-Based Testing
 
 This project implements a generator of arbitrary WebAssembly programs
-for the purpose of property-based testing of different WebAssembly engines.
+described in the paper
+
+> Árpád Perényi and Jan Midtgaard  
+> Stack-Driven Program Generation of WebAssembly  
+> APLAS'2020
+
+We run each generated WebAssembly (Wasm) program on the engines underlying Chrome, Firefox, Safari, and Edge
+and on the [WebAssembly reference interpreter](https://github.com/WebAssembly/spec) 
+and compare their output to help ensure consistent behaviour.
+
+Surprisingly this black-box generator approach found 2 crashing bugs,
+despite browser vendor efforts to fuzz test the engines with
+coverage-aware (gray-box) fuzzers.
 
 The code piggybacks on the [WebAssembly reference interpreter's](https://github.com/WebAssembly/spec) 
-abstract syntax tree (in OCaml).
+abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com/c-cube/qcheck) for property-based testing (QuickCheck). 
 
 
 ## External Dependencies
-
-* A `timeout` command
-  (on Mac OSX, install coreutils, then, e.g., `ln -s /opt/local/bin/gtimeout ~/bin/timeout`
 
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
@@ -20,23 +29,29 @@ abstract syntax tree (in OCaml).
 export PATH="$PATH:$PWD/spec/interpreter"
 ```
 
+* A `timeout` command to stop avoid infinite loops
+  (on Mac OSX: install coreutils, then, e.g., `ln -s /opt/local/bin/gtimeout ~/bin/timeout`
+
 * JavaScript (engine) Version Updater: [jsvu](https://github.com/GoogleChromeLabs/jsvu)
 ```
+jsvu --engines=chakra,javascriptcore,spidermonkey,v8
 export PATH="$PATH:$HOME/.jsvu"
 ```
 
+* [Node.js](https://nodejs.org/en/) to help transform a generated .wasm file into an independent JavaScript-file
+  suitable for running on a barebones JavaScript engine.
 
-### Former Dependencies
 
-Previous versions of the tester have depended on the following software.
+### An Optional Dependency
 
-* WebAssembly binary toolkit: [WebAssembly wabt](https://github.com/WebAssembly/wabt)
-  Assuming it is installed in the `wabt` sub-directory:
+The generator uses the reference interpreter for emitting the Wasm binary format (`.wasm`). 
+However we have also used the WebAssembly binary toolkit: [WebAssembly wabt](https://github.com/WebAssembly/wabt)
+to convert `.wat` to `.wasm`. This is a dependency to run our full internal testsuite.
+
+Assuming wabt is installed in the `wabt` sub-directory:
 ```
 export PATH="$PATH:$PWD/wabt/bin"
 ```
-* Eshost CLI: [eshost-cli](https://github.com/bterlson/eshost-cli)
-  (no longer a requirement)
 
 
 ## Running
@@ -46,7 +61,7 @@ With a recent OCaml installed, compiling should be as simple as:
   make
 ```
 
-Once compiled and the `PATH` setup, you can run the tests with:
+Once compiled and the `PATH` setup, you can generate 100 programs as follows:
 ```
   ./main.native -v
 ```
