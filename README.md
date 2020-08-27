@@ -1,7 +1,7 @@
 # Property-Based Testing of WebAssembly 
 
-This project implements a generator of arbitrary WebAssembly programs
-described in the paper
+This project implements a stack-driven generator of arbitrary WebAssembly programs
+described in the forthcoming paper
 
 > Árpád Perényi and Jan Midtgaard  
 > Stack-Driven Program Generation of WebAssembly  
@@ -25,13 +25,13 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
-* WebAssembly reference interpreter, from spec: [WebAssembly spec](https://github.com/WebAssembly/spec)
+* WebAssembly reference interpreter, from spec: [WebAssembly spec](https://github.com/WebAssembly/spec)   
   Assuming it is installed in the `spec` sub-directory:
 ```
 export PATH="$PATH:$PWD/spec/interpreter"
 ```
 
-* A `timeout` command to stop avoid infinite loops
+* A `timeout` command to break infinite loops
   (on Mac OSX: install coreutils, then, e.g., `ln -s /opt/local/bin/gtimeout ~/bin/timeout`
 
 * JavaScript (engine) Version Updater: [jsvu](https://github.com/GoogleChromeLabs/jsvu)
