@@ -58,8 +58,10 @@ export PATH="$PATH:$PWD/wabt/bin"
 
 ## Running
 
+We have tested the generator under both Linux and Mac OSX.   
 With a recent OCaml installed, compiling should be as simple as:
 ```
+  cd ocaml
   make
 ```
 
