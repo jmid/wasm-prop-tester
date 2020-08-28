@@ -31,6 +31,8 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 export PATH="$PATH:$PWD/spec/interpreter"
 ```
 
+* A `bash` shell with a `cmp` command for diffing log files of observed outputs
+
 * A `timeout` command to break infinite loops
   (on Mac OSX: install coreutils, then, e.g., `ln -s /opt/local/bin/gtimeout ~/bin/timeout`
 
