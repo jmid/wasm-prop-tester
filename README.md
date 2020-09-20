@@ -43,14 +43,19 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 * A `timeout` command to break infinite loops
   (on Mac OSX: install coreutils, then, e.g., `ln -s /opt/local/bin/gtimeout ~/bin/timeout`
 
+* [Node.js](https://nodejs.org/en/) to help transform a generated .wasm file into an independent JavaScript-file
+  suitable for running on a barebones JavaScript engine:
+  ```
+   sudo npm install -g npm
+  ```
+
 * JavaScript (engine) Version Updater: [jsvu](https://github.com/GoogleChromeLabs/jsvu)
 ```
+   sudo npm install -g jsvu
    jsvu --engines=chakra,javascriptcore,spidermonkey,v8
    export PATH="$PATH:$HOME/.jsvu"
 ```
 
-* [Node.js](https://nodejs.org/en/) to help transform a generated .wasm file into an independent JavaScript-file
-  suitable for running on a barebones JavaScript engine.
 
 
 ### An Optional Dependency
