@@ -27,16 +27,16 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 
 * WebAssembly reference interpreter, from the [WebAssembly spec](https://github.com/WebAssembly/spec).
   Install the `wasm` package using `ocamlfind`:
-```
-   cd spec/interpreter
-   make
-   make install
-```
+  ```
+  cd spec/interpreter
+  make
+  make install
+  ```
 
   Optionally set up `PATH` for reference interpreter (assuming it is installed in the `spec` sub-directory):
-```
-   export PATH="$PATH:$PWD/spec/interpreter"
-```
+  ```
+  export PATH="$PATH:$PWD/spec/interpreter"
+  ```
 
 * A `bash` shell with a `cmp` command for diffing log files of observed outputs
 
@@ -46,15 +46,15 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 * [Node.js](https://nodejs.org/en/) to help transform a generated .wasm file into an independent JavaScript-file
   suitable for running on a barebones JavaScript engine:
   ```
-   sudo npm install -g npm
+  sudo npm install -g npm
   ```
 
 * JavaScript (engine) Version Updater: [jsvu](https://github.com/GoogleChromeLabs/jsvu)
-```
-   sudo npm install -g jsvu
-   jsvu --engines=chakra,javascriptcore,spidermonkey,v8
-   export PATH="$PATH:$HOME/.jsvu"
-```
+  ```
+  sudo npm install -g jsvu
+  jsvu --engines=chakra,javascriptcore,spidermonkey,v8
+  export PATH="$PATH:$HOME/.jsvu"
+  ```
 
 
 
@@ -66,7 +66,7 @@ to convert `.wat` to `.wasm`. This is a dependency to run our full internal test
 
 Assuming wabt is installed in the `wabt` sub-directory:
 ```
-  export PATH="$PATH:$PWD/wabt/bin"
+ export PATH="$PATH:$PWD/wabt/bin"
 ```
 
 
@@ -75,19 +75,19 @@ Assuming wabt is installed in the `wabt` sub-directory:
 We have tested the generator under both Linux and Mac OSX.   
 With a recent OCaml installed, compiling should be as simple as:
 ```
-  cd ocaml
-  make
+ cd ocaml
+ make
 ```
 
 Once compiled and the `PATH` setup, you can generate 100 programs as follows:
 ```
-  ./main.native -v
+ ./main.native -v
 ```
 
 For fun, you can run a loop that continues restarting the test runner
 until it finds a counterexample:
 ```
-  while ./main.native -v; do :; done
+ while ./main.native -v; do :; done
 ```
 
 ## Issues Found
