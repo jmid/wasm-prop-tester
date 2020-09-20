@@ -25,7 +25,7 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
-* WebAssembly reference interpreter, from the [WebAssembly spec](https://github.com/WebAssembly/spec).
+* The WebAssembly reference interpreter from the [WebAssembly specification](https://github.com/WebAssembly/spec).  
   Install the `wasm` package using `ocamlfind`:
   ```
   cd spec/interpreter
@@ -43,7 +43,7 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 * A `timeout` command to break infinite loops
   (on Mac OSX: install coreutils, then, e.g., `ln -s /opt/local/bin/gtimeout ~/bin/timeout`
 
-* [Node.js](https://nodejs.org/en/) to help transform a generated .wasm file into an independent JavaScript-file
+* [Node.js](https://nodejs.org/en/) to help transform a generated `.wasm` file into an independent JavaScript-file
   suitable for running on a barebones JavaScript engine:
   ```
   sudo npm install -g npm
@@ -61,7 +61,7 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 ### An Optional Dependency
 
 The generator uses the reference interpreter for emitting the Wasm binary format (`.wasm`). 
-However we have also used the WebAssembly binary toolkit: [WebAssembly wabt](https://github.com/WebAssembly/wabt)
+However we have also used the [WebAssembly binary toolkit (wabt)](https://github.com/WebAssembly/wabt)
 to convert `.wat` to `.wasm`. This is a dependency to run our full internal testsuite.
 
 Assuming wabt is installed in the `wabt` sub-directory:
