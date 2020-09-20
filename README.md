@@ -97,3 +97,8 @@ until it finds a counterexample:
 * JavaScriptCore: [Register allocation crash? FATAL: No color for %ftmp0](https://bugs.webkit.org/show_bug.cgi?id=209294)  (known, already fixed)
 * JavaScriptCore: [br_table behavior](https://bugs.webkit.org/show_bug.cgi?id=209333) (new,confirmed)
 * Chakra: [Compile-time rejection of unreachable tee_local](https://github.com/microsoft/ChakraCore/issues/6185)  (known)
+
+
+### Other inconsistencies:
+
+* JavaScriptCore: [Different exception name properties](https://bugs.webkit.org/show_bug.cgi?id=204054)
