@@ -25,10 +25,17 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
 
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
-* WebAssembly reference interpreter, from spec: [WebAssembly spec](https://github.com/WebAssembly/spec)   
-  Assuming it is installed in the `spec` sub-directory:
+* WebAssembly reference interpreter, from the [WebAssembly spec](https://github.com/WebAssembly/spec).
+  Install the `wasm` package using `ocamlfind`:
 ```
-export PATH="$PATH:$PWD/spec/interpreter"
+   cd spec/interpreter
+   make
+   make install
+```
+
+  Optionally set up `PATH` for reference interpreter (assuming it is installed in the `spec` sub-directory):
+```
+   export PATH="$PATH:$PWD/spec/interpreter"
 ```
 
 * A `bash` shell with a `cmp` command for diffing log files of observed outputs
@@ -38,8 +45,8 @@ export PATH="$PATH:$PWD/spec/interpreter"
 
 * JavaScript (engine) Version Updater: [jsvu](https://github.com/GoogleChromeLabs/jsvu)
 ```
-jsvu --engines=chakra,javascriptcore,spidermonkey,v8
-export PATH="$PATH:$HOME/.jsvu"
+   jsvu --engines=chakra,javascriptcore,spidermonkey,v8
+   export PATH="$PATH:$HOME/.jsvu"
 ```
 
 * [Node.js](https://nodejs.org/en/) to help transform a generated .wasm file into an independent JavaScript-file
@@ -54,7 +61,7 @@ to convert `.wat` to `.wasm`. This is a dependency to run our full internal test
 
 Assuming wabt is installed in the `wabt` sub-directory:
 ```
-export PATH="$PATH:$PWD/wabt/bin"
+  export PATH="$PATH:$PWD/wabt/bin"
 ```
 
 
