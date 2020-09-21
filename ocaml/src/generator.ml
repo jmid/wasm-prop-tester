@@ -600,7 +600,8 @@ let run_diff_from_ocaml =
        let smrc  = run "sm" in
        let chrc  = run "ch" in
        let jscrc = run "jsc" in
-       let res = res && okish v8rc && v8rc = smrc && smrc = chrc && chrc = jscrc in
+       let res = res && okish v8rc && v8rc = smrc && smrc = jscrc &&
+                 (if ch_tee_local_bug "tmp/tmp_ch" then true else jscrc = chrc) in
        let och = open_out "tmp/tmp_spec" in
        let spec_res =
          timed_fork_prop 10 (JSLikeEval.run_module och) m (fun () -> flush och; close_out och) in
