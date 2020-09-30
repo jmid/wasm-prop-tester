@@ -1,11 +1,12 @@
 # Property-Based Testing of WebAssembly 
 
 This project implements a stack-driven generator of arbitrary WebAssembly programs
-described in the forthcoming paper
+described in the paper
 
 > Árpád Perényi and Jan Midtgaard  
 > Stack-Driven Program Generation of WebAssembly  
 > APLAS'2020
+> https://janmidtgaard.dk/papers/Perenyi-Midtgaard%3aAPLAS20.pdf
 
 We run each generated WebAssembly (Wasm) program on the engines underlying Chrome, Firefox, Safari, and Edge
 and on the [WebAssembly reference interpreter](https://github.com/WebAssembly/spec) 
