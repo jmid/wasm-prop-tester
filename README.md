@@ -5,7 +5,7 @@ described in the paper
 
 > Árpád Perényi and Jan Midtgaard  
 > Stack-Driven Program Generation of WebAssembly  
-> APLAS'2020
+> APLAS'2020  
 > https://janmidtgaard.dk/papers/Perenyi-Midtgaard%3aAPLAS20.pdf
 
 We run each generated WebAssembly (Wasm) program on the engines underlying Chrome, Firefox, Safari, and Edge
