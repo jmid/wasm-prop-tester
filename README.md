@@ -3,7 +3,7 @@
 This project implements a stack-driven generator of arbitrary WebAssembly programs
 described in the forthcoming paper
 
-> Árpád Perényi and Jan Midtgaard  
+> ÃrpÃ¡d PerÃ©nyi and Jan Midtgaard  
 > Stack-Driven Program Generation of WebAssembly  
 > APLAS'2020
 
@@ -90,6 +90,93 @@ until it finds a counterexample:
  while ./main.native -v; do :; done
 ```
 
+
+## Examples
+
+Here is first an example of successful test run:
+```
+ $ ./main.native -v
+ random seed: 169405920
+ generated error fail pass / total     time test name
+ [âœ“]  100    0    0  100 /  100    56.8s compare engines
+ ================================================================================
+ success (ran 1 tests)
+```
+In this case in less than 1 minute 100 modules were generated and had their output
+compared across the reference interpreter and the four JavaScript engines
+(V8, JavaScriptCore, SpiderMonkey, Chakra) without finding any disagreements.
+
+We can find the latest generated module in `tmp/tmp_module.{wat,wasm}`,
+its embeddings in `tmp/tmp_{v8,sm,jsc,ch}.js`, and the (normalized)
+outputs in `tmp/tmp_{v8,sm,jsc,ch,spec}`.
+
+
+
+Here's another example finding a disagreement:
+```
+ $ ./main.native -v
+ random seed: 252860053
+ generated error fail pass / total     time test name
+ [âœ—]   27    0    1   26 /  100    72.8s ref interpret vs. js-engines
+
+ --- Failure --------------------------------------------------------------------
+
+ Test ref interpret vs. js-engines failed (27 shrink steps):
+
+ (module
+   (memory $0 4)
+   (data
+     0
+     (offset (i32.const 261_218))
+     "\69\02\96\22\d8\19\8c\be\82\d1\61\67\ba\09\86\4a"
+     "\c4\53\dc\9f\7e\98\df\20\78\c2\11\dc\e4\8d\f6\f9"
+     "\d4\4b\3c\4b\c3\c5\03\c8\c1\16\55\03\a8\9f\78\52"
+
+     ...
+
+     "\bd\27\a7\dd\5b\39\b4\20\42\32\b0\c9\6a\ef\23\fe"
+     "\0a\ae\86\cd\66\f4\ed\02\11\43\7e\d2\47\95\0c\2d"
+     "\38\16\29\35\25\87\86\09\cb\96\a1\12\06\d7\5c"
+   )
+ )
+
+ ================================================================================
+ failure (1 tests failed, 0 tests errored, ran 1 tests)
+```
+Here, on the 27th generated module a disagreement was found. Afterwards it took
+27 shrinking steps (reductions or simplications) to cut the counterexample down.
+In total it a little more than one minute.
+
+Since the last (unsuccessful) shrinking step overwrote the previous
+output files, we save the previous disagreeing run in separate files.
+The latest generated module illustrating disagreement is stored in `tmp/prev.{wat,wasm}`,
+its embeddings in `tmp/prev_{v8,sm,jsc,ch}.js`, and the (normalized)
+outputs in `tmp/prev_{v8,sm,jsc,ch,spec}`.
+
+We can thus observe the output disagreement:
+```
+ $ cat tmp/prev_{ch,jsc,sm,v8,spec}
+ LinkError data segment does not fit memory
+ LinkError data segment does not fit memory
+ RuntimeError out of bounds memory access
+ RuntimeError data segment does not fit memory
+ LinkError data segment does not fit memory
+```
+Here we see that the counterexample triggers a `RuntimeError` exception
+on SpiderMonkey and V8 but a `LinkError` exception on Chakra, JavaScriptCore,
+and in the reference interpreter. Furthermore, we failed to normalize
+SpiderMonkey's exception message to something agreeing with the rest.
+
+Printing the unnormalized messages carried by each exception shows a
+range of detail, revealing how it may be tricky to separate this
+particular SpiderMoney error from others (from shortest to longest):
+
+- SM: `index out of bounds`
+- CH: `Data segment is out of range`
+- V8: `WebAssembly.Instance(): data segment is out of bounds`
+- JSC: `Invalid data segment initialization: segment of 927 bytes memory of 262144 bytes, at offset 261218, segment writes outside of memory (evaluating 'new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject)')`
+
+
 ## Issues Found
 
 * SpiderMonkey: [Crash when start function is added to table](https://bugzilla.mozilla.org/show_bug.cgi?id=1545086)  (new, fixed)
@@ -102,3 +189,5 @@ until it finds a counterexample:
 ### Other inconsistencies:
 
 * JavaScriptCore: [Different exception name properties](https://bugs.webkit.org/show_bug.cgi?id=204054)
+* Different stack overflow exceptions (described in the paper, not reported)
+* Different data segment exceptions (described in the paper and above, not reported)
