@@ -191,3 +191,6 @@ particular SpiderMoney error from others (from shortest to longest):
 * JavaScriptCore: [Different exception name properties](https://bugs.webkit.org/show_bug.cgi?id=204054)
 * Different stack overflow exceptions (described in the paper, not reported)
 * Different data segment exceptions (described in the paper and above, not reported)
+
+
+If you find more errors using the generator please let us know.
