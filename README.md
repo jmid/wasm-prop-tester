@@ -145,7 +145,7 @@ Here's another example finding a disagreement:
 ```
 Here, on the 27th generated module a disagreement was found. Afterwards it took
 27 shrinking steps (reductions or simplications) to cut the counterexample down.
-In total it a little more than one minute.
+In total it took a little more than one minute.
 
 Since the last (unsuccessful) shrinking step overwrote the previous
 output files, we save the previous disagreeing run in separate files.
