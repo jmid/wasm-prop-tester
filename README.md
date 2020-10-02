@@ -91,6 +91,12 @@ until it finds a counterexample:
  while ./main.native -v; do :; done
 ```
 
+If `jsc` complains about an unsupported locale (and thus producing a different output)
+```
+ export LC_ALL="C"
+```
+should make it behave.
+
 
 ## Examples
 
