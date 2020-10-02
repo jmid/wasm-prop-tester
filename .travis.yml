@@ -1,0 +1,14 @@
+language: c
+
+install:
+  - wget https://raw.githubusercontent.com/ocaml/ocaml-ci-scripts/master/.travis-ocaml.sh
+  - bash -ex .travis-ocaml.sh
+  - opam install -y qcheck wasm
+
+script: cd ocaml && eval $(opam env) && make
+
+env:
+  - OCAML_VERSION=4.10
+
+os:
+  - linux
