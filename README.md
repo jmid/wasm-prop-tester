@@ -1,5 +1,7 @@
 # Property-Based Testing of WebAssembly 
 
+[![Build Status](https://travis-ci.com/jmid/wasm-prop-tester.svg?branch=master)](https://travis-ci.com/jmid/wasm-prop-tester)
+
 This project implements a stack-driven generator of arbitrary WebAssembly programs
 described in the paper
 
