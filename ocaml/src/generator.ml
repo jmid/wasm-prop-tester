@@ -611,14 +611,15 @@ let run_diff_from_ocaml =
          timed_fork_prop 10 (JSLikeEval.run_module och) m (fun () -> flush och; close_out och) in
        let res = res && (match spec_res with | Timeout -> v8rc = timeout | Res res -> res) in
        let res = res &&
-          (if ch_tee_local_bug "tmp/tmp_ch"
-            || data_segment_diff  "tmp/tmp_ch" "tmp/tmp_sm"
+          (if data_segment_diff  "tmp/tmp_ch" "tmp/tmp_sm"
            then true
            else
-             (0 = Sys.command "cmp -s -n 5000 tmp/tmp_ch  tmp/tmp_jsc" &&
-              0 = Sys.command "cmp -s -n 5000 tmp/tmp_jsc tmp/tmp_sm" &&
-              0 = Sys.command "cmp -s -n 5000 tmp/tmp_sm  tmp/tmp_v8" &&
-              0 = Sys.command "cmp -s -n 300  tmp/tmp_v8 tmp/tmp_spec")) in
+             (if ch_tee_local_bug "tmp/tmp_ch"
+              then true
+              else 0 = Sys.command "cmp -s -n 5000 tmp/tmp_ch  tmp/tmp_jsc") &&
+             0 = Sys.command "cmp -s -n 5000 tmp/tmp_jsc tmp/tmp_sm" &&
+             0 = Sys.command "cmp -s -n 5000 tmp/tmp_sm  tmp/tmp_v8" &&
+             0 = Sys.command "cmp -s -n 300  tmp/tmp_v8 tmp/tmp_spec") in
        if not res
        then
          begin
