@@ -585,6 +585,10 @@ let okish code = code = 0 || code = timeout
 let ch_tee_local_bug fname =
   0 = Sys.command ("grep -q 'tee_local' " ^ fname)
 
+let data_segment_diff ch_fname sm_fname =
+  0 = Sys.command ("grep -q 'LinkError data segment does not fit memory' " ^ ch_fname)
+    && 0 = Sys.command ("grep -q 'RuntimeError out of bounds memory access' " ^ sm_fname)
+
 let run_diff_from_ocaml =
   Test.make ~name:"ref interpret vs. js-engines" ~count:100(*00*)
     (arb_module)
@@ -608,11 +612,13 @@ let run_diff_from_ocaml =
        let res = res && (match spec_res with | Timeout -> v8rc = timeout | Res res -> res) in
        let res = res &&
           (if ch_tee_local_bug "tmp/tmp_ch"
+            || data_segment_diff  "tmp/tmp_ch" "tmp/tmp_sm"
            then true
-           else 0 = Sys.command "cmp -s -n 5000 tmp/tmp_ch  tmp/tmp_jsc") &&
-          0 = Sys.command "cmp -s -n 5000 tmp/tmp_jsc tmp/tmp_sm" &&
-          0 = Sys.command "cmp -s -n 5000 tmp/tmp_sm  tmp/tmp_v8" &&
-          0 = Sys.command "cmp -s -n 300  tmp/tmp_v8 tmp/tmp_spec" in
+           else
+             (0 = Sys.command "cmp -s -n 5000 tmp/tmp_ch  tmp/tmp_jsc" &&
+              0 = Sys.command "cmp -s -n 5000 tmp/tmp_jsc tmp/tmp_sm" &&
+              0 = Sys.command "cmp -s -n 5000 tmp/tmp_sm  tmp/tmp_v8" &&
+              0 = Sys.command "cmp -s -n 300  tmp/tmp_v8 tmp/tmp_spec")) in
        if not res
        then
          begin
