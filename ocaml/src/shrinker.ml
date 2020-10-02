@@ -249,17 +249,18 @@ let rec instr_list_shrink m' is = match is with
          map (fun is'' -> as_phrase (Ast.Block (sts,is''))::is) (instr_list_shrink m' is')
        | Ast.Loop (sts,is') ->
          (match sts with
-          | []  -> return is
-          | [t] -> return (const_zero_instr t::is)
-          | _   -> empty)
+          | ValBlockType None     -> return is
+          | ValBlockType (Some t) -> return (const_zero_instr t::is)
+          | VarBlockType _        -> empty)
          <+>
          (if contains_label is' then empty else return (is'@is))
          <+>
          map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink m' is')
        | Ast.If (sts,is1,is2) ->
          (match sts with
-          | [t] -> return ((as_phrase Ast.Drop)::(const_zero_instr t)::is)
-          | _   -> empty)
+          | ValBlockType (Some t) -> return ((as_phrase Ast.Drop)::(const_zero_instr t)::is)
+          | ValBlockType None
+          | VarBlockType _        -> empty)
          <+>
          (if contains_label is1 then empty else return ((as_phrase Ast.Drop)::is1@is))
          <+>

@@ -473,7 +473,7 @@ and globalSet_gen (con: context_) t_opt size = match t_opt with
 (** align_load_gen **)
 and align_load_gen t p_opt =
   let width = match p_opt with
-    | Some (p,_) -> Memory.packed_size p
+    | Some (p,_) -> Types.packed_size p
     | None       -> Types.size t in
   Gen.int_bound (log2 (width / 8))
 
@@ -485,8 +485,8 @@ and load_gen con t_opt size = match con.mems with
       | None   -> Gen.return None
       | Some t ->
         Gen.((match t with
-            | I32Type -> opt (pair (oneofl Memory.([Pack8;Pack16]))        (oneofl Memory.([SX;ZX])))
-            | I64Type -> opt (pair (oneofl Memory.([Pack8;Pack16;Pack32])) (oneofl Memory.([SX;ZX])))
+            | I32Type -> opt (pair (oneofl Types.([Pack8;Pack16]))        (oneofl Types.([SX;ZX])))
+            | I64Type -> opt (pair (oneofl Types.([Pack8;Pack16;Pack32])) (oneofl Types.([SX;ZX])))
             | F32Type
             | F64Type (* storage size only allowed for integer loads *)
             | MemIndexType
@@ -501,7 +501,7 @@ and load_gen con t_opt size = match con.mems with
 (** align_store_gen **)
 and align_store_gen t p_opt =
   let width = match p_opt with
-    | Some p -> Memory.packed_size p
+    | Some p -> Types.packed_size p
     | None   -> Types.size t in
   Gen.int_bound (log2 (width / 8))
 
@@ -515,8 +515,8 @@ and store_gen con t_opt size = match con.mems with
       if (Int32.to_int m.min) < 1
       then Gen.return None
       else Gen.(value_type_gen >>= fun t -> (match t with
-          | I32Type -> opt (oneofl Memory.([Pack8;Pack16]))
-          | I64Type -> opt (oneofl Memory.([Pack8;Pack16;Pack32]))
+          | I32Type -> opt (oneofl Types.([Pack8;Pack16]))
+          | I64Type -> opt (oneofl Types.([Pack8;Pack16;Pack32]))
           | F32Type
           | F64Type (* storage size only allowed for integer stores *)
           | MemIndexType
@@ -568,8 +568,8 @@ and block_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (t_opt, t_opt) con) ot (size/2) >>=
     function
-      | Some instrs -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, List.rev instrs)), []))
-      | None        -> return (Some (con, as_phrase (Ast.Block (to_stack_type ot, [])), [])))
+      | Some instrs -> return (Some (con, as_phrase (Ast.Block (ValBlockType (to_opt_stack_type t_opt), List.rev instrs)), []))
+      | None        -> return (Some (con, as_phrase (Ast.Block (ValBlockType (to_opt_stack_type t_opt), [])), [])))
    (*FIXME: on generation failure, an empty block does not leave [t] on the stack *)
 
 (*** Loop ***)
@@ -581,8 +581,8 @@ and loop_gen (con: context_) t_opt size =
   in
   Gen.(instrs_rule (addLabel (None, t_opt) con) ot (size/2) >>=
     function
-      | Some instrs -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, List.rev instrs)), []))
-      | None        -> return (Some (con, as_phrase (Ast.Loop (to_stack_type ot, [])), [])))
+      | Some instrs -> return (Some (con, as_phrase (Ast.Loop (ValBlockType (to_opt_stack_type t_opt), List.rev instrs)), []))
+      | None        -> return (Some (con, as_phrase (Ast.Loop (ValBlockType (to_opt_stack_type t_opt), [])), [])))
    (*FIXME: on generation failure, an empty loop body does not leave [t] on the stack? *)
 
 (*** If ***)
@@ -601,7 +601,7 @@ and if_gen (con: context_) t_opt size =
         let instrs2 = match instrs_opt2 with
           | Some instrs -> instrs
           | None        -> [] in
-        return (Some (con, as_phrase (Ast.If (to_stack_type ot, List.rev instrs1, List.rev instrs2)), [I32Type])))
+        return (Some (con, as_phrase (Ast.If (ValBlockType (to_opt_stack_type t_opt), List.rev instrs1, List.rev instrs2)), [I32Type])))
 
 (*** Br ***)
 (** br_gen : context_ -> value_type option -> int -> (context_ * instr * value_type list) option Gen.t **)

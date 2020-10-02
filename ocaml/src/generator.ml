@@ -224,7 +224,7 @@ let rec func_type_list_to_type_phrase func_type_list = match func_type_list with
     let ot_opt = match snd e with
       | None   -> []
       | Some t -> [to_wasm_value_type t] in
-    (as_phrase (Types.FuncType (to_stack_type (fst e), ot_opt)))::(func_type_list_to_type_phrase rst)
+    (as_phrase (Types.FuncType (to_list_stack_type (fst e), ot_opt)))::(func_type_list_to_type_phrase rst)
 
 let process_elems (con: context_) el = 
   let rec elem_array elems i = function
@@ -265,7 +265,7 @@ let rec rec_func_gen con res func_types index = Gen.(match func_types with
       let instrs = match instrs_opt with
         | Some inst -> inst
         | None      -> failwith "body generation failed" in
-      let func = as_phrase (get_func (as_phrase (Int32.of_int index)) (to_stack_type locals) (List.rev instrs)) in
+      let func = as_phrase (get_func (as_phrase (Int32.of_int index)) (to_list_stack_type locals) (List.rev instrs)) in
       rec_func_gen con (func::res) rst (index + 1))
 
 let module_gen = Gen.(
@@ -682,7 +682,7 @@ let buffer_test =
                as_phrase (Ast.LocalGet (as_phrase 0l));
                as_phrase (Ast.Const (as_phrase (Values.I32 (Int32.of_int i))));
                as_phrase (Ast.Compare (Values.I32 (Ast.IntOp.Eq)));
-               as_phrase (Ast.If ([],
+               as_phrase (Ast.If (ValBlockType None,
                                   [as_phrase Ast.Return],
                                   [as_phrase (Ast.Const (as_phrase (Values.I32 1l)));
                                    as_phrase (Ast.Call (as_phrase 0l));
@@ -693,7 +693,7 @@ let buffer_test =
            as_phrase (get_func (as_phrase 2l) [] [
                as_phrase (Ast.Const (as_phrase (Values.I32 1l)));
                as_phrase (Ast.Call (as_phrase 1l));
-               as_phrase (Ast.Loop ([Types.I32Type], [
+               as_phrase (Ast.Loop (ValBlockType (Some Types.I32Type), [
                     (as_phrase (Ast.Const (as_phrase (Values.I32 1l))));
                     (as_phrase (Ast.Br (as_phrase 0l)))
                   ]))])];

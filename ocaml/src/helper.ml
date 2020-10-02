@@ -44,7 +44,8 @@ let to_wasm_value_type = function
   | MemIndexType -> Types.I32Type
   | TableIndex _ -> Types.I32Type
 
-let to_stack_type = List.map to_wasm_value_type
+let to_opt_stack_type = Option.map to_wasm_value_type
+let to_list_stack_type = List.map to_wasm_value_type
 
 let string_to_name s =
   let rec exp i l =
