@@ -14,6 +14,5 @@ install:
   - opam install -y qcheck wasm
 
 script:
-  - cd ocaml
   - eval $(opam env)
   - make
