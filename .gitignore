@@ -10,7 +10,7 @@
 *.js
 *.zip
 *.mlpack
-ocaml/_build
-ocaml/tmp
-ocaml/coverage
+_build
+tmp
+coverage
 bisect*
