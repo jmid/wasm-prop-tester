@@ -78,7 +78,6 @@ Assuming wabt is installed in the `wabt` sub-directory:
 We have tested the generator under both Linux and Mac OSX.   
 With a recent OCaml installed, compiling should be as simple as:
 ```
- cd ocaml
  make
 ```
 
