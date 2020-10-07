@@ -38,6 +38,19 @@ let rec max_global il = match il with
     | Ast.GlobalSet v -> max v.it (max_global rst)
     | _               -> max_global rst
 *)
+
+let rec max_local il = match il with
+  | [] -> -1l
+  | (e: Ast.instr)::rst ->
+    match e.it with
+    | Ast.Block (_,l) -> max (max_local rst) (max_local l)
+    | Ast.Loop (_,l)  -> max (max_local rst) (max_local l)
+    | Ast.If (_,l,l') -> max (max_local rst) (max (max_local l) (max_local l'))
+    | Ast.LocalGet v  -> max v.it (max_local rst)
+    | Ast.LocalSet v  -> max v.it (max_local rst)
+    | Ast.LocalTee v  -> max v.it (max_local rst)
+    | _               -> max_local rst
+
 let rec rename_fun trn frn il = match il with
   | [] -> il
   | (e: Ast.instr)::rst ->
@@ -345,6 +358,17 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
       (map
          (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
          (instr_list_shrink m' f.Source.it.Ast.body))
+      <+>
+      (let locals = f.Source.it.Ast.locals in
+       let max_local = Int32.to_int (max_local f.Source.it.Ast.body) in
+       if max_local < List.length locals - 1
+       then
+         let locals' = ref [] in
+         begin
+           List.iteri (fun i l -> if i <= max_local then locals':=l::!locals') locals;
+           return ((as_phrase { f.it with Ast.locals = List.rev !locals'})::fs)
+         end
+       else empty)
       <+>
       map (fun fs' -> f::fs') (shrink_functions m' fs types))
 
