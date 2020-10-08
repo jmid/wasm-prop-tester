@@ -176,6 +176,7 @@ let rec instr_list_shrink m' ls is = match is with
              (if contains_label is1 then empty else return (is1@is))
              <+>
              (if contains_label is2 then empty else return (is2@is))
+           | Ast.Const _, Ast.BrTable ([],l)  -> return (as_phrase (Ast.Br l)::is)
            | Ast.Unreachable, Ast.Unreachable -> return (j::is) (* bubble unreach down *)
            | Ast.Unreachable,               _ -> return (j::i::is)
            | _, _ -> empty))
@@ -251,7 +252,6 @@ let rec instr_list_shrink m' ls is = match is with
             | [t] -> return (build_drops (List.length input) @ [const_zero_instr t] @ is)
             | _   -> empty)
 
-
        | Ast.CallIndirect n ->
          let ftype = List.nth m'.Ast.types (Int32.to_int n.it) in
          let FuncType (input,output) = ftype.it in
@@ -279,7 +279,11 @@ let rec instr_list_shrink m' ls is = match is with
          map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink m' ls is')
        | Ast.If (sts,is1,is2) ->
          (match sts with
-          | ValBlockType (Some t) -> return ((as_phrase Ast.Drop)::(const_zero_instr t)::is)
+          | ValBlockType (Some t) ->
+            of_list
+              [ (as_phrase Ast.Drop)::(const_zero_instr t)::is;
+                as_phrase (Ast.If (sts,[const_zero_instr t],is2))::is;
+                as_phrase (Ast.If (sts,is1,[const_zero_instr t]))::is ]
           | ValBlockType None
           | VarBlockType _        -> empty)
          <+>
