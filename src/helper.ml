@@ -183,6 +183,14 @@ let find_index p gs =
     | g::gs -> if p g then i else loop (i+1) gs in
   loop 0 gs
 
+(*  find_array_index : ('a -> bool) -> 'a array -> int  *)
+let find_array_index p gs =
+  let rec loop i gs =
+    if i = Array.length gs
+    then failwith "find_index: not found"
+    else if p gs.(i) then i else loop (i+1) gs in
+  loop 0 gs
+
 let rec take n xs = match n,xs with
   | 0, _     -> []
   | _, []    -> []
