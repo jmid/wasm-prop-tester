@@ -218,10 +218,10 @@ let rec instr_list_shrink m' ls is = match is with
 
        (* FIXME: similar for LocalSet, LocalTee *)
        | Ast.LocalGet l ->
-         let my_type = (*List.nth ls*) ls.(Int32.to_int l.Source.it) in
+         let my_type = List.nth ls (Int32.to_int l.Source.it) in
          return (const_zero_instr my_type::is)
          <+> (* or replace LocalGet with another, lower-indexed one *)
-         let i = find_array_index (fun t -> t = my_type) ls in
+         let i = find_index (fun t -> t = my_type) ls in
          if i < (Int32.to_int l.Source.it)
          then return (as_phrase (Ast.LocalGet (as_phrase (I32.of_int_s i)))::is)
          else empty
@@ -311,7 +311,7 @@ let global_shrink m' g =
   let g' = g.Source.it in
   Iter.map
     (fun is -> as_phrase { g' with Ast.value = as_phrase is })
-    (instr_list_shrink m' [||] g'.Ast.value.Source.it) (*no locals*)
+    (instr_list_shrink m' [] g'.Ast.value.Source.it) (*no locals*)
 (*
   let { Ast.gtype : Wasm.Types.global_type; Ast.value : const; } = g' in
   match List.find_opt (fun g -> g.Source.it.Ast.gtype ) gs with
@@ -358,22 +358,23 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
       <+>
       (let Types.FuncType (params,_) = fun_typ.Source.it in
        let locals = f.Source.it.Ast.locals in
+       let locals_len = List.length locals in
+       let params_locals = params @ locals in
+       let params_len = List.length params in
        (map
           (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
-          (instr_list_shrink m' (Array.of_list (params @ locals)) f.Source.it.Ast.body)))
-      <+>
-      (let Types.FuncType (params,_) = fun_typ.Source.it in
-       let locals = f.Source.it.Ast.locals in
+          (instr_list_shrink m' params_locals f.Source.it.Ast.body))
+       <+>
        if locals = []
        then empty
        else
          let max_local = Int32.to_int (max_local f.Source.it.Ast.body) in
-         if max_local < List.length (params @ locals) - 1
+         if max_local < params_len + locals_len - 1
          then
            let locals' =
-             if max_local < List.length params
+             if max_local < params_len
              then []
-             else take (1 + max_local - List.length params) locals in
+             else take (1 + max_local - params_len) locals in
            return ((as_phrase { f.it with Ast.locals = locals'})::fs)
          else empty)
       <+>
@@ -410,7 +411,7 @@ let shrink_string s = match s with
 let shrink_data m' s =
   Iter.(
     (map (fun c' -> as_phrase {s.Source.it with Ast.offset = as_phrase c'})
-       (instr_list_shrink m' [||] s.Source.it.Ast.offset.Source.it)) (*no locals*)
+       (instr_list_shrink m' [] s.Source.it.Ast.offset.Source.it)) (*no locals*)
     <+>
     (map (fun s' -> as_phrase {s.Source.it with Ast.init = s'})
        (shrink_string s.Source.it.Ast.init)))
