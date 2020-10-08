@@ -186,3 +186,8 @@ let rec take n xs = match n,xs with
   | 0, _     -> []
   | _, []    -> []
   | _, x::xs -> x::take (n-1) xs
+
+let first_type_index l ls =
+  let my_type = List.nth ls (Int32.to_int l.Source.it) in
+  let i = find_index (fun t -> t = my_type) ls in
+  my_type,Int32.of_int i

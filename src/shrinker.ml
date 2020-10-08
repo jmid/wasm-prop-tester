@@ -183,7 +183,6 @@ let rec instr_list_shrink m' ls is = match is with
       <+>
       (match i.Source.it with
        | Ast.Nop
-       | Ast.LocalTee _
        | Ast.MemoryGrow
        | Ast.Unary _    -> return is         (* no change in stack -> omit *)
        | Ast.MemorySize -> return ((const_zero_instr Types.I32Type)::is)
@@ -205,26 +204,38 @@ let rec instr_list_shrink m' ls is = match is with
           then return (as_phrase (Ast.GlobalSet (as_phrase (I32.of_int_s i)))::is)
           else empty)
        | Ast.GlobalGet g ->                  (* change GlobalGets into Consts *)
-         let glob = List.nth m'.Ast.globals (Int32.to_int g.it) in
-         let GlobalType (typ,_) = glob.Source.it.Ast.gtype in
-         return ((const_zero_instr typ)::is)
+         let gs = m'.Ast.globals in
+         let glob = List.nth gs (Int32.to_int g.it) in
+         let GlobalType (vtype,_) = glob.Source.it.Ast.gtype in
+         return ((const_zero_instr vtype)::is)
          <+> (* or replace GlobalGet with another, lower-indexed one *)
-         (let Wasm.Types.GlobalType (vtype,_) = glob.Source.it.Ast.gtype in
-          let i = find_index
-                    (fun g -> let Wasm.Types.GlobalType (vtype',_) = g.Source.it.Ast.gtype in
-                              vtype = vtype') m'.Ast.globals in
+         (let i = find_index
+                    (fun g -> let GlobalType (vtype',_) = g.Source.it.Ast.gtype in
+                              vtype = vtype') gs in
           if i < (Int32.to_int g.it)
           then return (as_phrase (Ast.GlobalGet (as_phrase (I32.of_int_s i)))::is)
           else empty)
 
-       (* FIXME: similar for LocalSet, LocalTee *)
+       | Ast.LocalTee l ->
+         return is         (* no change in stack -> omit *)
+         <+> (* or replace LocalTee with another, lower-indexed one *)
+         let _,i = first_type_index l ls in
+         if i < l.Source.it
+         then return (as_phrase (Ast.LocalTee (as_phrase i))::is)
+         else empty
+       | Ast.LocalSet l ->
+         return ((as_phrase Ast.Drop)::is)
+         <+> (* or replace LocalSet with another, lower-indexed one *)
+         let _,i = first_type_index l ls in
+         if i < l.Source.it
+         then return (as_phrase (Ast.LocalSet (as_phrase i))::is)
+         else empty
        | Ast.LocalGet l ->
-         let my_type = List.nth ls (Int32.to_int l.Source.it) in
+         let my_type,i = first_type_index l ls in
          return (const_zero_instr my_type::is)
          <+> (* or replace LocalGet with another, lower-indexed one *)
-         let i = find_index (fun t -> t = my_type) ls in
-         if i < (Int32.to_int l.Source.it)
-         then return (as_phrase (Ast.LocalGet (as_phrase (I32.of_int_s i)))::is)
+         if i < l.Source.it
+         then return (as_phrase (Ast.LocalGet (as_phrase i))::is)
          else empty
 
        | Ast.Load l ->
