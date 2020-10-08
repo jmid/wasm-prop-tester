@@ -205,12 +205,8 @@ let rec instr_list_shrink m' ls is = match is with
           else empty)
        | Ast.GlobalGet g ->                  (* change GlobalGets into Consts *)
          let glob = List.nth m'.Ast.globals (Int32.to_int g.it) in
-         (let zero = (match glob.Source.it.Ast.gtype with
-              | GlobalType (I32Type,_) -> Values.I32 I32.zero
-              | GlobalType (I64Type,_) -> Values.I64 I64.zero
-              | GlobalType (F32Type,_) -> Values.F32 F32.zero
-              | GlobalType (F64Type,_) -> Values.F64 F64.zero) in
-          return ((as_phrase (Ast.Const (as_phrase zero)))::is))
+         let GlobalType (typ,_) = glob.Source.it.Ast.gtype in
+         return ((const_zero_instr typ)::is)
          <+> (* or replace GlobalGet with another, lower-indexed one *)
          (let Wasm.Types.GlobalType (vtype,_) = glob.Source.it.Ast.gtype in
           let i = find_index
@@ -220,10 +216,12 @@ let rec instr_list_shrink m' ls is = match is with
           then return (as_phrase (Ast.GlobalGet (as_phrase (I32.of_int_s i)))::is)
           else empty)
 
-       (* FIXME: same for LocalSet, LocalTee *)
+       (* FIXME: similar for LocalSet, LocalTee *)
        | Ast.LocalGet l ->
-         let my_type = List.nth ls (Int32.to_int l.Source.it) in
-         let i = find_index (fun t -> t = my_type) ls in
+         let my_type = (*List.nth ls*) ls.(Int32.to_int l.Source.it) in
+         return (const_zero_instr my_type::is)
+         <+> (* or replace LocalGet with another, lower-indexed one *)
+         let i = find_array_index (fun t -> t = my_type) ls in
          if i < (Int32.to_int l.Source.it)
          then return (as_phrase (Ast.LocalGet (as_phrase (I32.of_int_s i)))::is)
          else empty
@@ -313,7 +311,7 @@ let global_shrink m' g =
   let g' = g.Source.it in
   Iter.map
     (fun is -> as_phrase { g' with Ast.value = as_phrase is })
-    (instr_list_shrink m' [] g'.Ast.value.Source.it) (*no locals*)
+    (instr_list_shrink m' [||] g'.Ast.value.Source.it) (*no locals*)
 (*
   let { Ast.gtype : Wasm.Types.global_type; Ast.value : const; } = g' in
   match List.find_opt (fun g -> g.Source.it.Ast.gtype ) gs with
@@ -354,21 +352,15 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
            map
              (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
              (match fun_typ.Source.it with
-              | Types.FuncType ([],[]) ->  return []
-              | Types.FuncType (_,[rt]) ->
-                let last = match rt with
-                    | I32Type -> Values.I32 I32.zero
-                    | I64Type -> Values.I64 I64.zero
-                    | F32Type -> Values.F32 F32.zero
-                    | F64Type -> Values.F64 F64.zero in
-                return [as_phrase (Ast.Const (as_phrase last))]
+              | Types.FuncType ([],[])  -> return []
+              | Types.FuncType (_,[rt]) -> return [const_zero_instr rt]
               | _ -> empty))
       <+>
       (let Types.FuncType (params,_) = fun_typ.Source.it in
        let locals = f.Source.it.Ast.locals in
        (map
           (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
-          (instr_list_shrink m' (params @ locals) f.Source.it.Ast.body)))
+          (instr_list_shrink m' (Array.of_list (params @ locals)) f.Source.it.Ast.body)))
       <+>
       (let Types.FuncType (params,_) = fun_typ.Source.it in
        let locals = f.Source.it.Ast.locals in
@@ -418,7 +410,7 @@ let shrink_string s = match s with
 let shrink_data m' s =
   Iter.(
     (map (fun c' -> as_phrase {s.Source.it with Ast.offset = as_phrase c'})
-       (instr_list_shrink m' [] s.Source.it.Ast.offset.Source.it)) (*no locals*)
+       (instr_list_shrink m' [||] s.Source.it.Ast.offset.Source.it)) (*no locals*)
     <+>
     (map (fun s' -> as_phrase {s.Source.it with Ast.init = s'})
        (shrink_string s.Source.it.Ast.init)))
