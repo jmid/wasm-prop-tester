@@ -176,9 +176,14 @@ let rec log2 n = match n with
   | _ -> 1 + log2 (n lsr 1)
 
 
-(*  find_global_index : (Ast.global -> bool) -> Ast.global list -> int  *)
-let find_global_index p gs =
+(*  find_index : ('a -> bool) -> 'a list -> int  *)
+let find_index p gs =
   let rec loop i gs = match gs with
-    | [] -> failwith "find_global: not found"
+    | [] -> failwith "find_index: not found"
     | g::gs -> if p g then i else loop (i+1) gs in
   loop 0 gs
+
+let rec take n xs = match n,xs with
+  | 0, _     -> []
+  | _, []    -> []
+  | _, x::xs -> x::take (n-1) xs

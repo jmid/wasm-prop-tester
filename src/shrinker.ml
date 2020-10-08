@@ -116,7 +116,8 @@ let const_zero_instr t =
     | Types.F64Type -> Values.F64 F64.zero in
   as_phrase (Ast.Const (as_phrase zero))
 
-let rec instr_list_shrink m' is = match is with
+(*  instr_list_shrink : module_' -> value_type list -> instr list -> instr list Iter.t *)
+let rec instr_list_shrink m' ls is = match is with
   | [] -> Iter.empty
   | i::is ->
     Iter.(
@@ -198,7 +199,7 @@ let rec instr_list_shrink m' is = match is with
          (let gs = m'.Ast.globals in
           let glob = List.nth gs (Int32.to_int g.it) in
           let gtype = glob.Source.it.Ast.gtype in
-          let i = find_global_index (fun g -> gtype = g.Source.it.Ast.gtype) gs in
+          let i = find_index (fun g -> gtype = g.Source.it.Ast.gtype) gs in
           if i < (Int32.to_int g.it)
           then return (as_phrase (Ast.GlobalSet (as_phrase (I32.of_int_s i)))::is)
           else empty)
@@ -212,12 +213,21 @@ let rec instr_list_shrink m' is = match is with
           return ((as_phrase (Ast.Const (as_phrase zero)))::is))
          <+> (* or replace GlobalGet with another, lower-indexed one *)
          (let Wasm.Types.GlobalType (vtype,_) = glob.Source.it.Ast.gtype in
-          let i = find_global_index
+          let i = find_index
                     (fun g -> let Wasm.Types.GlobalType (vtype',_) = g.Source.it.Ast.gtype in
                               vtype = vtype') m'.Ast.globals in
           if i < (Int32.to_int g.it)
           then return (as_phrase (Ast.GlobalGet (as_phrase (I32.of_int_s i)))::is)
           else empty)
+
+       (* FIXME: same for LocalSet, LocalTee *)
+       | Ast.LocalGet l ->
+         let my_type = List.nth ls (Int32.to_int l.Source.it) in
+         let i = find_index (fun t -> t = my_type) ls in
+         if i < (Int32.to_int l.Source.it)
+         then return (as_phrase (Ast.LocalGet (as_phrase (I32.of_int_s i)))::is)
+         else empty
+
        | Ast.Load l ->
          return ((as_phrase Ast.Drop)::(const_zero_instr l.Ast.ty)::is)
          <+>
@@ -259,7 +269,7 @@ let rec instr_list_shrink m' is = match is with
          if is=[] then empty else return [i] (* delete instrs after return *)
        | Ast.Block (sts,[])  -> return is    (* remove empty block *)
        | Ast.Block (sts,is') ->
-         map (fun is'' -> as_phrase (Ast.Block (sts,is''))::is) (instr_list_shrink m' is')
+         map (fun is'' -> as_phrase (Ast.Block (sts,is''))::is) (instr_list_shrink m' ls is')
        | Ast.Loop (sts,is') ->
          (match sts with
           | ValBlockType None     -> return is
@@ -268,7 +278,7 @@ let rec instr_list_shrink m' is = match is with
          <+>
          (if contains_label is' then empty else return (is'@is))
          <+>
-         map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink m' is')
+         map (fun is'' -> as_phrase (Ast.Loop (sts,is''))::is) (instr_list_shrink m' ls is')
        | Ast.If (sts,is1,is2) ->
          (match sts with
           | ValBlockType (Some t) -> return ((as_phrase Ast.Drop)::(const_zero_instr t)::is)
@@ -279,9 +289,9 @@ let rec instr_list_shrink m' is = match is with
          <+>
          (if contains_label is2 then empty else return ((as_phrase Ast.Drop)::is2@is))
          <+>
-         (map (fun is' -> as_phrase (Ast.If (sts,is',is2))::is) (instr_list_shrink m' is1))
+         (map (fun is' -> as_phrase (Ast.If (sts,is',is2))::is) (instr_list_shrink m' ls is1))
          <+>
-         (map (fun is' -> as_phrase (Ast.If (sts,is1,is'))::is) (instr_list_shrink m' is2))
+         (map (fun is' -> as_phrase (Ast.If (sts,is1,is'))::is) (instr_list_shrink m' ls is2))
        | Ast.BrTable (vs,v) ->
          map (fun vs' -> as_phrase (Ast.BrTable (vs',v))::is) (Shrink.list vs)
        | Ast.Const l -> (match l.Source.it with
@@ -296,14 +306,14 @@ let rec instr_list_shrink m' is = match is with
          )
        | _ -> empty)
       <+>
-      map (fun is' -> i::is') (instr_list_shrink m' is)
+      map (fun is' -> i::is') (instr_list_shrink m' ls is)
     )
 
 let global_shrink m' g =
   let g' = g.Source.it in
   Iter.map
     (fun is -> as_phrase { g' with Ast.value = as_phrase is })
-    (instr_list_shrink m' g'.Ast.value.Source.it)
+    (instr_list_shrink m' [] g'.Ast.value.Source.it) (*no locals*)
 (*
   let { Ast.gtype : Wasm.Types.global_type; Ast.value : const; } = g' in
   match List.find_opt (fun g -> g.Source.it.Ast.gtype ) gs with
@@ -335,6 +345,7 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
   match fs with
   | [] -> Iter.empty
   | f::fs ->
+    let fun_typ = List.nth types (Int32.to_int f.it.ftype.it) in
     Iter.(
       (match f.it.Ast.body with
          | []  -> empty (* don't shrink empty body *)
@@ -342,9 +353,7 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
          | _  ->
            map
              (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
-             ((let var = f.it.ftype.it in
-              let typ = List.nth types (Int32.to_int var) in
-              match typ.Source.it with
+             (match fun_typ.Source.it with
               | Types.FuncType ([],[]) ->  return []
               | Types.FuncType (_,[rt]) ->
                 let last = match rt with
@@ -353,22 +362,28 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
                     | F32Type -> Values.F32 F32.zero
                     | F64Type -> Values.F64 F64.zero in
                 return [as_phrase (Ast.Const (as_phrase last))]
-              | _ -> empty)))
+              | _ -> empty))
       <+>
-      (map
-         (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
-         (instr_list_shrink m' f.Source.it.Ast.body))
+      (let Types.FuncType (params,_) = fun_typ.Source.it in
+       let locals = f.Source.it.Ast.locals in
+       (map
+          (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
+          (instr_list_shrink m' (params @ locals) f.Source.it.Ast.body)))
       <+>
-      (let locals = f.Source.it.Ast.locals in
-       let max_local = Int32.to_int (max_local f.Source.it.Ast.body) in
-       if max_local < List.length locals - 1
-       then
-         let locals' = ref [] in
-         begin
-           List.iteri (fun i l -> if i <= max_local then locals':=l::!locals') locals;
-           return ((as_phrase { f.it with Ast.locals = List.rev !locals'})::fs)
-         end
-       else empty)
+      (let Types.FuncType (params,_) = fun_typ.Source.it in
+       let locals = f.Source.it.Ast.locals in
+       if locals = []
+       then empty
+       else
+         let max_local = Int32.to_int (max_local f.Source.it.Ast.body) in
+         if max_local < List.length (params @ locals) - 1
+         then
+           let locals' =
+             if max_local < List.length params
+             then []
+             else take (1 + max_local - List.length params) locals in
+           return ((as_phrase { f.it with Ast.locals = locals'})::fs)
+         else empty)
       <+>
       map (fun fs' -> f::fs') (shrink_functions m' fs types))
 
@@ -403,10 +418,10 @@ let shrink_string s = match s with
 let shrink_data m' s =
   Iter.(
     (map (fun c' -> as_phrase {s.Source.it with Ast.offset = as_phrase c'})
-      (instr_list_shrink m' s.Source.it.Ast.offset.Source.it))
+       (instr_list_shrink m' [] s.Source.it.Ast.offset.Source.it)) (*no locals*)
     <+>
     (map (fun s' -> as_phrase {s.Source.it with Ast.init = s'})
-        (shrink_string s.Source.it.Ast.init)))
+       (shrink_string s.Source.it.Ast.init)))
 
 (*let shrink_limits (l : Int32.t Wasm.Types.limits) = Shrink.nil l*)
 
