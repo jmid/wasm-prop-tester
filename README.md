@@ -1,6 +1,5 @@
-# Property-Based Testing of WebAssembly 
-
-[![Build Status](https://travis-ci.com/jmid/wasm-prop-tester.svg?branch=master)](https://travis-ci.com/jmid/wasm-prop-tester)
+Property-Based Testing of WebAssembly [![Build Status](https://travis-ci.com/jmid/wasm-prop-tester.svg?branch=master)](https://travis-ci.com/jmid/wasm-prop-tester)
+========================================================
 
 This project implements a stack-driven generator of arbitrary WebAssembly programs
 described in the paper
@@ -24,7 +23,8 @@ The code piggybacks on the [WebAssembly reference interpreter's](https://github.
 abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com/c-cube/qcheck) for property-based testing (QuickCheck). 
 
 
-## External Dependencies
+External Dependencies
+---------------------
 
 * OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
 
@@ -60,8 +60,8 @@ abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com
   ```
 
 
-
-### An Optional Dependency
+An Optional Dependency
+----------------------
 
 The generator uses the reference interpreter for emitting the Wasm binary format (`.wasm`). 
 However we have also used the [WebAssembly binary toolkit (wabt)](https://github.com/WebAssembly/wabt)
@@ -73,7 +73,8 @@ Assuming wabt is installed in the `wabt` sub-directory:
 ```
 
 
-## Running
+Running
+-------
 
 We have tested the generator under both Linux and Mac OSX.   
 With a recent OCaml installed, compiling should be as simple as:
@@ -99,7 +100,8 @@ If `jsc` complains about an unsupported locale (and thus producing a different o
 should make it behave.
 
 
-## Examples
+Examples
+--------
 
 Here is first an example of successful test run:
 ```
@@ -185,7 +187,8 @@ particular SpiderMoney error from others (from shortest to longest):
 - JSC: `Invalid data segment initialization: segment of 927 bytes memory of 262144 bytes, at offset 261218, segment writes outside of memory (evaluating 'new WebAssembly.Instance(new WebAssembly.Module(buffer), importObject)')`
 
 
-## Issues Found
+Issues Found
+------------
 
 * SpiderMonkey: [Crash when start function is added to table](https://bugzilla.mozilla.org/show_bug.cgi?id=1545086)  (new, fixed)
 * JavaScriptCore: [Wasm engine segmentation fault](https://bugs.webkit.org/show_bug.cgi?id=202786)
