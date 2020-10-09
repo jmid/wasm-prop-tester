@@ -307,7 +307,7 @@ let rec instr_list_shrink m' ls is = match is with
          <+>
          (map (fun is' -> as_phrase (Ast.If (sts,is1,is'))::is) (instr_list_shrink m' ls is2))
        (* uncond branch -> drop remaining instructions *)
-       | Ast.Br l   -> return [i]
+       | Ast.Br l   -> if is = [] then empty else return [i]
        | Ast.BrIf l -> return (as_phrase Ast.Drop::as_phrase (Ast.Br l)::is)
        | Ast.BrTable (vs,v) ->
          map (fun vs' -> as_phrase (Ast.BrTable (vs',v))::is) (Shrink.list vs)
