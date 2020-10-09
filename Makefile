@@ -17,6 +17,7 @@ cov:
 	# ocamlbuild -package qcheck,wasm,bigarray -no-hygiene -I includes_4.04.0spacetime/ src/generator.native
 	ocamlbuild -use-ocamlfind -package qcheck,wasm,bisect_ppx src/main.native
 	#ocamlbuild -use-ocamlfind -package qcheck,wasm,bisect_ppx src/generator.cma
+	ocamlbuild -use-ocamlfind -package qcheck,wasm,bisect_ppx src/shrinktest.native
 
 clean:
 	ocamlbuild -clean
