@@ -249,10 +249,11 @@ let rec instr_list_shrink m' ls is = match is with
        | Ast.Call n ->
          let fs = m'.Ast.funcs in
          let n = Int32.to_int n.Source.it in
-         if n < List.length m'.imports
+         let imports_len = List.length m'.imports in
+         if n < imports_len
          then return ((as_phrase Ast.Drop)::is)  (* replace import call with drop *)
          else
-           let f = List.nth fs (n - List.length m'.imports) in
+           let f = List.nth fs (n - imports_len) in
            let ftype = List.nth m'.Ast.types (Int32.to_int f.it.ftype.it) in
            let FuncType (input,output) = ftype.it in
            let rec build_drops n = match n with
@@ -373,16 +374,18 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
       <+>
       (let Types.FuncType (params,_) = fun_typ.Source.it in
        let locals = f.Source.it.Ast.locals in
-       let locals_len = List.length locals in
        let params_locals = params @ locals in
-       let params_len = List.length params in
        (map
           (fun body' -> (as_phrase { f.it with Ast.body = body' })::fs)
           (instr_list_shrink m' params_locals f.Source.it.Ast.body))
+       <+> (* postpone expensive local reduction by trying rec. shrink first *)
+       map (fun fs' -> f::fs') (shrink_functions m' fs types)
        <+>
        if locals = []
        then empty
        else
+         let locals_len = List.length locals in
+         let params_len = List.length params in
          let max_local = Int32.to_int (max_local f.Source.it.Ast.body) in
          if max_local < params_len + locals_len - 1
          then
@@ -391,9 +394,7 @@ let rec shrink_functions m' (fs : Ast.func list) (types : Wasm.Ast.type_ list) =
              then []
              else take (1 + max_local - params_len) locals in
            return ((as_phrase { f.it with Ast.locals = locals'})::fs)
-         else empty)
-      <+>
-      map (fun fs' -> f::fs') (shrink_functions m' fs types))
+         else empty))
 
 (* attempt at a better string shrinker *)
 let shrink_string s yield =
@@ -510,26 +511,26 @@ let module_shrink (m : Wasm.Ast.module_' Wasm.Source.phrase) =
         <+> (* shrink imports and types combined *)
         (try (* 3 imports, start, 3 exports *)
            let imports = m.it.Ast.imports in
-           let num_imps = List.length imports in
-           let imp_ts,rest_ts = split num_imps m.it.Ast.types in
+           let num_imports = List.length imports in
+           let imp_ts,rest_ts = split num_imports m.it.Ast.types in
            let ts_and_imps = List.combine imp_ts imports in
            filter module_valid
              (Shrink.list ts_and_imps >>= fun ts_and_imps' ->
               let imp_ts',imp_fs = List.split ts_and_imps' in
-              let num_imps' = List.length imp_fs in
+              let num_imports' = List.length imp_fs in
               let types' = imp_ts'@rest_ts in
               let new_fun_idx i = (* adj. for #imports *)
-                if Int32.to_int i < List.length imports
+                if Int32.to_int i < num_imports
                 then match renamed_index imports imp_fs (Int32.to_int i) with
                   | None -> raise (FuncRemoved i)
                   | Some j -> Int32.of_int j
-                else Int32.(of_int (to_int i - num_imps + num_imps')) in
+                else Int32.(of_int (to_int i - num_imports + num_imports')) in
               let new_type_idx i = (* adj. for #imports *)
-                if Int32.to_int i < List.length imports
+                if Int32.to_int i < num_imports
                 then match renamed_index imp_ts imp_ts' (Int32.to_int i) with
                   | None -> raise (TypeRemoved i)
                   | Some j -> Int32.of_int j
-                else Int32.(of_int (to_int i - num_imps + num_imps')) in
+                else Int32.(of_int (to_int i - num_imports + num_imports')) in
               try
                 let funcs' = adjust_funcs new_type_idx new_fun_idx m.it.Ast.funcs in
                 let exps'  = adjust_exports new_fun_idx m.it.Ast.exports in
