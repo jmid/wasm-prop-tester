@@ -28,7 +28,7 @@ let indirect_re = /(WebAssembly exported function expected)|(Function called wit
       console.log(
 `let unrepresentable_re = /(unrepresentable in)/;
 let zero_div_re = /(Division by zero)/;
-let overflow_re = /Out of bounds Trunc operation/;
+let overflow_re = /(Out of bounds Trunc operation)|(Integer overflow)/;
 let unreachable_re = /(Unreachable code should not be executed)/;
 let stack_re = /(Maximum call stack size exceeded)/;
 let data_segment_re = /(segment writes outside of memory)/;
@@ -52,7 +52,7 @@ let indirect_re = /(indirect call to null)|(indirect call signature mismatch)/;
       console.log(
 `let unrepresentable_re = /(unrepresentable in)/;
 let zero_div_re = /(divide|remainder) by zero/;
-let overflow_re = /(float unrepresentable in integer range)/;
+let overflow_re = /(float unrepresentable in integer range)|(divide result unrepresentable)/;
 let unreachable_re = /(unreachable)/;
 let stack_re = /(Maximum call stack size exceeded)/;
 let data_segment_re = /(data segment is out of bounds)/;
