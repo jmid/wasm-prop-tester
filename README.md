@@ -197,6 +197,7 @@ Issues Found
 * Chakra: [Compile-time rejection of unreachable tee_local](https://github.com/microsoft/ChakraCore/issues/6185)  (known)
 * Chakra: [Stack overflow crash](https://github.com/microsoft/ChakraCore/issues/6524)  (new)
 
+* Wasmer: [Type mismatch on validation](https://github.com/wasmerio/wasmer/issues/1740)
 
 ### Other inconsistencies:
 
