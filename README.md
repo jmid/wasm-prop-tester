@@ -19,26 +19,21 @@ Surprisingly this black-box generator approach found 2 crashing bugs,
 despite browser vendor efforts to fuzz test the engines with
 coverage-aware (gray-box) fuzzers.
 
-The code piggybacks on the [WebAssembly reference interpreter's](https://github.com/WebAssembly/spec) 
-abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com/c-cube/qcheck) for property-based testing (QuickCheck). 
+The code piggybacks on the [WebAssembly reference interpreter's](https://github.com/WebAssembly/spec)
+abstract syntax tree (in OCaml) and uses the [QCheck library](https://github.com/c-cube/qcheck) for property-based testing (QuickCheck).
 
 
 External Dependencies
 ---------------------
 
-* OCaml and the [QCheck](https://github.com/c-cube/qcheck) package
-
-* The WebAssembly reference interpreter from the [WebAssembly specification](https://github.com/WebAssembly/spec).  
-  Install the `wasm` package using `ocamlfind`:
+* OCaml and the [QCheck](https://github.com/c-cube/qcheck) package:
   ```
-  cd spec/interpreter
-  make
-  make install
+  opam install qcheck
   ```
 
-  Optionally set up `PATH` for reference interpreter (assuming it is installed in the `spec` sub-directory):
+* The WebAssembly reference interpreter from the [WebAssembly specification](https://github.com/WebAssembly/spec):
   ```
-  export PATH="$PATH:$PWD/spec/interpreter"
+  opam install wasm
   ```
 
 * A `bash` shell with a `cmp` command for diffing log files of observed outputs
@@ -63,7 +58,7 @@ External Dependencies
 An Optional Dependency
 ----------------------
 
-The generator uses the reference interpreter for emitting the Wasm binary format (`.wasm`). 
+The generator uses the reference interpreter for emitting the Wasm binary format (`.wasm`).
 However we have also used the [WebAssembly binary toolkit (wabt)](https://github.com/WebAssembly/wabt)
 to convert `.wat` to `.wasm`. This is a dependency to run our full internal testsuite.
 
@@ -76,7 +71,7 @@ Assuming wabt is installed in the `wabt` sub-directory:
 Running
 -------
 
-We have tested the generator under both Linux and Mac OSX.   
+We have tested the generator under both Linux and Mac OSX.
 With a recent OCaml installed, compiling should be as simple as:
 ```
  make
